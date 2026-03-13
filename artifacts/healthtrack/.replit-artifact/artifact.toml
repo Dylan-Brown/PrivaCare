@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "HealthTrack"
+version = "1.0.0"
+id = "artifacts/healthtrack"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+localPort = 21928
+name = "expo"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/healthtrack run dev"
+
+[services.env]
+PORT = "21928"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/healthtrack", "run", "build"]
+run = ["pnpm", "--filter", "@workspace/healthtrack", "run", "serve"]
