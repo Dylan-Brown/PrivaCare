@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { logMedicationDoseToHealthKit } from "@/utils/healthKit";
 
 export type Medication = {
   id: string;
@@ -190,6 +191,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     groupId?: string,
     groupName?: string
   ) => {
+    const now = new Date();
     setMedications(prevMeds => {
       const med = prevMeds.find(m => m.id === medicationId);
       if (!med) return prevMeds;
@@ -199,7 +201,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         medicationName: med.name,
         dosage: med.dosage,
         unit: med.unit,
-        takenAt: new Date().toISOString(),
+        takenAt: now.toISOString(),
         groupId,
         groupName,
       };
@@ -208,6 +210,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.setItem(STORAGE_KEYS.MED_LOGS, JSON.stringify(updatedLogs));
         return updatedLogs;
       });
+      logMedicationDoseToHealthKit(med.name, now);
       const newCount = Math.max(0, med.remainingCount - 1);
       const updatedMeds = prevMeds.map(m =>
         m.id === medicationId ? { ...m, remainingCount: newCount } : m
@@ -218,6 +221,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logMedicationGroup = useCallback(async (groupId: string) => {
+    const now = new Date();
     setMedicationGroups(prevGroups => {
       const group = prevGroups.find(g => g.id === groupId);
       if (!group) return prevGroups;
@@ -231,7 +235,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             medicationName: med.name,
             dosage: med.dosage,
             unit: med.unit,
-            takenAt: new Date().toISOString(),
+            takenAt: now.toISOString(),
             groupId,
             groupName: group.name,
           };
@@ -240,6 +244,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             AsyncStorage.setItem(STORAGE_KEYS.MED_LOGS, JSON.stringify(updated));
             return updated;
           });
+          logMedicationDoseToHealthKit(med.name, now);
           const updatedMeds = prevMeds.map(m =>
             m.id === medId ? { ...m, remainingCount: Math.max(0, m.remainingCount - 1) } : m
           );
