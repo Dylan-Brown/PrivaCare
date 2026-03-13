@@ -24,6 +24,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "sparkles", selected: "sparkles" }} />
         <Label>Skincare</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
+        <Label>Settings</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -33,7 +37,6 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const insets = useSafeAreaInsets();
 
   const colors = isDark ? Colors.dark : Colors.light;
 
@@ -104,6 +107,18 @@ function ClassicTabLayout() {
               <SymbolView name="sparkles" tintColor={color} size={24} />
             ) : (
               <Ionicons name="sparkles" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="gearshape.fill" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="settings" size={22} color={color} />
             ),
         }}
       />
