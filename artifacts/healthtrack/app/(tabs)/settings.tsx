@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -15,7 +16,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -31,6 +31,12 @@ import {
   restoreBackup,
   saveBackupToDocuments,
 } from "@/utils/backup";
+import {
+  getHealthKitSyncEnabled,
+  isHealthKitAvailable,
+  requestHealthKitPermissions,
+  setHealthKitSyncEnabled,
+} from "@/utils/healthKit";
 
 type ActionState = "idle" | "loading" | "success" | "error";
 
@@ -43,6 +49,7 @@ function RowItem({
   onPress,
   trailing,
   disabled,
+  last,
 }: {
   icon: string;
   iconColor: string;
@@ -52,13 +59,15 @@ function RowItem({
   onPress?: () => void;
   trailing?: React.ReactNode;
   disabled?: boolean;
+  last?: boolean;
 }) {
   const { colors } = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.rowItem,
-        { borderBottomColor: colors.borderLight, opacity: pressed && !disabled ? 0.7 : disabled ? 0.4 : 1 },
+        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderLight },
+        { opacity: pressed && !disabled ? 0.7 : disabled ? 0.4 : 1 },
       ]}
       onPress={onPress}
       disabled={disabled}
@@ -69,23 +78,19 @@ function RowItem({
       <View style={styles.rowText}>
         <Text style={[styles.rowTitle, { color: colors.text }]}>{title}</Text>
         {subtitle && (
-          <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+          <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={3}>
             {subtitle}
           </Text>
         )}
       </View>
-      {trailing ?? (
-        onPress ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null
-      )}
+      {trailing ?? (onPress ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null)}
     </Pressable>
   );
 }
 
 function SectionHeader({ title }: { title: string }) {
   const { colors } = useTheme();
-  return (
-    <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{title}</Text>
-  );
+  return <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{title}</Text>;
 }
 
 function StatusBanner({ state, message }: { state: ActionState; message: string }) {
@@ -99,12 +104,12 @@ function StatusBanner({ state, message }: { state: ActionState; message: string 
       translateY.value = withSpring(0);
       const timer = setTimeout(() => {
         opacity.value = withTiming(0, { duration: 300 });
-      }, 3000);
+      }, 3500);
       return () => clearTimeout(timer);
     }
   }, [state, message]);
 
-  const style = useAnimatedStyle(() => ({
+  const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
@@ -112,13 +117,13 @@ function StatusBanner({ state, message }: { state: ActionState; message: string 
   const isSuccess = state === "success";
   const bg = isSuccess ? colors.tintLight : colors.accentLight;
   const fg = isSuccess ? colors.tint : colors.danger;
-  const icon = isSuccess ? "checkmark-circle" : "alert-circle";
+  const iconName = isSuccess ? "checkmark-circle" : "alert-circle";
 
   if (state === "idle" || state === "loading") return null;
 
   return (
-    <Animated.View style={[styles.banner, { backgroundColor: bg, borderColor: `${fg}30` }, style]}>
-      <Ionicons name={icon} size={16} color={fg} />
+    <Animated.View style={[styles.banner, { backgroundColor: bg, borderColor: `${fg}30` }, animStyle]}>
+      <Ionicons name={iconName} size={16} color={fg} />
       <Text style={[styles.bannerText, { color: fg }]}>{message}</Text>
     </Animated.View>
   );
@@ -138,13 +143,45 @@ export default function SettingsScreen() {
   const [importState, setImportState] = useState<ActionState>("idle");
   const [importMessage, setImportMessage] = useState("");
   const [savedBackups, setSavedBackups] = useState<string[]>([]);
-  const [pendingBackup, setPendingBackup] = useState<BackupData | null>(null);
+
+  const [hkAvailable, setHkAvailable] = useState(false);
+  const [hkEnabled, setHkEnabled] = useState(false);
+  const [hkConnecting, setHkConnecting] = useState(false);
+  const [hkMessage, setHkMessage] = useState("");
+  const [hkMessageState, setHkMessageState] = useState<ActionState>("idle");
 
   useEffect(() => {
     if (Platform.OS !== "web") {
       listBackups().then(setSavedBackups);
     }
+    if (Platform.OS === "ios") {
+      isHealthKitAvailable().then(setHkAvailable);
+      getHealthKitSyncEnabled().then(setHkEnabled);
+    }
   }, [saveState]);
+
+  const handleToggleHealthKit = useCallback(async (value: boolean) => {
+    if (value && !hkEnabled) {
+      setHkConnecting(true);
+      const result = await requestHealthKitPermissions();
+      setHkConnecting(false);
+      if (result.success) {
+        await setHealthKitSyncEnabled(true);
+        setHkEnabled(true);
+        setHkMessageState("success");
+        setHkMessage("Apple Health sync enabled — dose events will be written when you log a medication");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setHkMessageState("error");
+        setHkMessage(result.message);
+      }
+      setTimeout(() => setHkMessageState("idle"), 5000);
+    } else {
+      await setHealthKitSyncEnabled(false);
+      setHkEnabled(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [hkEnabled]);
 
   const handleExport = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -178,10 +215,9 @@ export default function SettingsScreen() {
       setTimeout(() => setImportState("idle"), 4000);
       return;
     }
-    setPendingBackup(result.data);
+    const backup = result.data;
     setImportState("idle");
 
-    const backup = result.data;
     const exportedAt = formatBackupDate(backup.exportedAt);
     const medCount = Array.isArray(backup.medications) ? backup.medications.length : 0;
     const productCount = Array.isArray(backup.skincareProducts) ? backup.skincareProducts.length : 0;
@@ -190,16 +226,18 @@ export default function SettingsScreen() {
       "Restore Backup?",
       `This backup from ${exportedAt} contains ${medCount} medication${medCount !== 1 ? "s" : ""} and ${productCount} skincare product${productCount !== 1 ? "s" : ""}.\n\nThis will replace all current data. This cannot be undone.`,
       [
-        { text: "Cancel", style: "cancel", onPress: () => setPendingBackup(null) },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Restore",
           style: "destructive",
           onPress: async () => {
             const restoreResult = await restoreBackup(backup);
-            setPendingBackup(null);
             setImportState(restoreResult.success ? "success" : "error");
-            setImportMessage(restoreResult.success ? "Data restored — please restart the app" : restoreResult.message);
+            setImportMessage(
+              restoreResult.success ? "Data restored — please restart the app" : restoreResult.message
+            );
             if (restoreResult.success) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setTimeout(() => setImportState("idle"), 4000);
           },
         },
       ]
@@ -231,11 +269,69 @@ export default function SettingsScreen() {
           <View style={styles.privacyText}>
             <Text style={[styles.privacyTitle, { color: colors.tintDark }]}>100% On-Device Storage</Text>
             <Text style={[styles.privacySub, { color: colors.tintDark }]}>
-              All your health data is stored only on this device using local storage. Nothing is sent to any server.
+              All your health data stays on this device using local storage. Nothing is sent to any server.
             </Text>
           </View>
         </View>
       </View>
+
+      {Platform.OS === "ios" && (
+        <>
+          <SectionHeader title="APPLE HEALTH" />
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.rowItem, styles.rowItemLast]}>
+              <View style={[styles.rowIcon, { backgroundColor: "#FF375F20" }]}>
+                <Ionicons name="heart" size={18} color="#FF375F" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Sync to Apple Health</Text>
+                <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+                  {hkEnabled
+                    ? "Dose events are written to Apple Health when you log a medication"
+                    : hkAvailable
+                    ? "Log dose events to your Apple Health timeline when you take a medication"
+                    : "Requires a native iOS build — not available in the Expo preview"}
+                </Text>
+              </View>
+              {hkConnecting ? (
+                <ActivityIndicator size="small" color="#FF375F" />
+              ) : (
+                <Switch
+                  value={hkEnabled}
+                  onValueChange={handleToggleHealthKit}
+                  disabled={!hkAvailable || hkConnecting}
+                  trackColor={{ false: colors.border, true: "#FF375F" }}
+                  thumbColor="#fff"
+                  ios_backgroundColor={colors.border}
+                />
+              )}
+            </View>
+          </View>
+
+          <StatusBanner state={hkMessageState} message={hkMessage} />
+
+          {hkEnabled && (
+            <View style={[styles.hkInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="information-circle-outline" size={15} color={colors.textSecondary} />
+              <Text style={[styles.hkInfoText, { color: colors.textSecondary }]}>
+                When you log a medication in Vital, a{" "}
+                <Text style={{ fontFamily: "Inter_600SemiBold" }}>Medication Dose Event</Text> is written to
+                Apple Health. Your dose history will appear in the Health app under{" "}
+                <Text style={{ fontFamily: "Inter_600SemiBold" }}>Browse → Other Data → Medications</Text>.
+              </Text>
+            </View>
+          )}
+
+          {!hkAvailable && (
+            <View style={[styles.hkInfoCard, { backgroundColor: colors.amberLight, borderColor: `${colors.amber}30` }]}>
+              <Ionicons name="warning-outline" size={15} color={colors.amber} />
+              <Text style={[styles.hkInfoText, { color: colors.amber }]}>
+                Apple Health sync requires a native iOS build made with EAS Build or Xcode. It is not available in the Expo Go preview.
+              </Text>
+            </View>
+          )}
+        </>
+      )}
 
       <SectionHeader title="YOUR DATA" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -259,6 +355,7 @@ export default function SettingsScreen() {
           iconBg={colors.blueLight}
           title="Log History"
           subtitle={`${totalMedLogs} medication log${totalMedLogs !== 1 ? "s" : ""}, ${totalSkincareLogs} skincare log${totalSkincareLogs !== 1 ? "s" : ""}`}
+          last
         />
       </View>
 
@@ -270,7 +367,7 @@ export default function SettingsScreen() {
             iconColor={colors.blue}
             iconBg={colors.blueLight}
             title="Save to Documents"
-            subtitle="Saves a backup file to your local Documents folder, which iCloud can back up automatically"
+            subtitle="Saves a backup file to your local Documents folder, which iCloud backs up automatically"
             onPress={saveState === "loading" ? undefined : handleSaveLocal}
             disabled={saveState === "loading"}
             trailing={
@@ -299,9 +396,10 @@ export default function SettingsScreen() {
           iconColor={colors.amber}
           iconBg={colors.amberLight}
           title="Restore from Backup"
-          subtitle="Choose a Vital backup file (.json) to restore your data"
+          subtitle="Choose a Vital backup (.json) to restore your data"
           onPress={importState === "loading" ? undefined : handleImport}
           disabled={importState === "loading"}
+          last
           trailing={
             importState === "loading" ? (
               <ActivityIndicator size="small" color={colors.amber} />
@@ -328,6 +426,7 @@ export default function SettingsScreen() {
                   iconBg={colors.borderLight}
                   title={`Backup ${datePart}`}
                   subtitle={filename}
+                  last={i === savedBackups.length - 1}
                 />
               );
             })}
@@ -337,30 +436,18 @@ export default function SettingsScreen() {
 
       <SectionHeader title="HOW ICLOUD BACKUP WORKS" />
       <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.infoStep}>
-          <View style={[styles.stepNum, { backgroundColor: colors.tintLight }]}>
-            <Text style={[styles.stepNumText, { color: colors.tint }]}>1</Text>
+        {[
+          'Tap "Save to Documents" to write a backup file to your device\'s Documents folder',
+          "If iCloud Drive is enabled on your iPhone, iOS automatically backs up your Documents folder",
+          'To restore, tap "Restore from Backup" and select your saved .json file from the Files app',
+        ].map((text, i) => (
+          <View key={i} style={styles.infoStep}>
+            <View style={[styles.stepNum, { backgroundColor: colors.tintLight }]}>
+              <Text style={[styles.stepNumText, { color: colors.tint }]}>{i + 1}</Text>
+            </View>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>{text}</Text>
           </View>
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            Tap "Save to Documents" to write a backup file to your device's Documents folder
-          </Text>
-        </View>
-        <View style={styles.infoStep}>
-          <View style={[styles.stepNum, { backgroundColor: colors.tintLight }]}>
-            <Text style={[styles.stepNumText, { color: colors.tint }]}>2</Text>
-          </View>
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            If iCloud Drive is enabled on your iPhone, iOS automatically backs up your Documents folder
-          </Text>
-        </View>
-        <View style={styles.infoStep}>
-          <View style={[styles.stepNum, { backgroundColor: colors.tintLight }]}>
-            <Text style={[styles.stepNumText, { color: colors.tint }]}>3</Text>
-          </View>
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            To restore, tap "Restore from Backup" and select your saved .json file from the Files app
-          </Text>
-        </View>
+        ))}
       </View>
 
       <Text style={[styles.footerNote, { color: colors.textTertiary }]}>
@@ -415,8 +502,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  rowItemLast: {},
   rowIcon: {
     width: 34,
     height: 34,
@@ -439,6 +526,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bannerText: { fontSize: 14, fontFamily: "Inter_500Medium", flex: 1 },
+
+  hkInfoCard: {
+    flexDirection: "row",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 8,
+    alignItems: "flex-start",
+  },
+  hkInfoText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+    flex: 1,
+  },
 
   infoCard: {
     borderRadius: 16,
