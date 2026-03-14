@@ -10,9 +10,9 @@ export type HealthKitStatus =
   | "authorized"
   | "denied";
 
-let _HK: typeof import("@kingstinct/react-native-healthkit") | null = null;
+let _HK: any = null;
 
-async function getHK() {
+async function getHK(): Promise<any | null> {
   if (Platform.OS !== "ios") return null;
   if (_HK) return _HK;
   try {
@@ -27,7 +27,7 @@ export async function isHealthKitAvailable(): Promise<boolean> {
   const HK = await getHK();
   if (!HK) return false;
   try {
-    return await HK.default.isHealthDataAvailable();
+    return await HK.isHealthDataAvailable();
   } catch {
     return false;
   }
@@ -59,7 +59,7 @@ export async function requestHealthKitPermissions(): Promise<{
     };
   }
   try {
-    const available = await HK.default.isHealthDataAvailable();
+    const available = await HK.isHealthDataAvailable();
     if (!available) {
       return {
         success: false,
@@ -67,10 +67,10 @@ export async function requestHealthKitPermissions(): Promise<{
       };
     }
 
-    await HK.default.requestAuthorization(
-      [HK.HKCategoryTypeIdentifier.medicationDoseEvent],
-      []
-    );
+    await HK.requestAuthorization({
+      toShare: ["HKCategoryTypeIdentifierMedicationDoseEvent"],
+      toRead: [],
+    });
 
     return {
       success: true,
@@ -104,11 +104,11 @@ export async function logMedicationDoseToHealthKit(
   if (!HK) return;
 
   try {
-    await HK.default.saveCategory(
-      HK.HKCategoryTypeIdentifier.medicationDoseEvent,
+    await HK.saveCategorySample(
+      "HKCategoryTypeIdentifierMedicationDoseEvent",
+      0,
       takenAt,
       takenAt,
-      HK.HKCategoryValueNotApplicable,
       { HKMetadataKeyExternalUUID: medicationName }
     );
   } catch (err) {
