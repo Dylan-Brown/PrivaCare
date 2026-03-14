@@ -8,17 +8,25 @@ import React, {
 } from "react";
 import { logMedicationDoseToHealthKit } from "@/utils/healthKit";
 
+export type MedicationStatus = "active" | "storage" | "history";
+export type MedicationCategory = "prescription" | "generic" | "supplement";
+
 export type Medication = {
   id: string;
   name: string;
+  brandName?: string;
   dosage: string;
   unit: string;
   color: string;
+  bottleCount: number;
   totalCount: number;
   remainingCount: number;
   lowStockThreshold: number;
   notifyLowStock: boolean;
   groupId?: string;
+  status: MedicationStatus;
+  awaitingRefill?: boolean;
+  category?: MedicationCategory;
 };
 
 export type MedicationGroup = {
@@ -82,6 +90,10 @@ type AppContextType = {
   logMedication: (medicationId: string, groupId?: string, groupName?: string) => Promise<void>;
   logMedicationGroup: (groupId: string) => Promise<void>;
   refillMedication: (medicationId: string, amount: number) => Promise<void>;
+  setRemainingCount: (id: string, count: number) => Promise<void>;
+  archiveMedication: (id: string, mode: "storage" | "history") => Promise<void>;
+  unarchiveMedication: (id: string) => Promise<void>;
+  setAwaitingRefill: (id: string, value: boolean) => Promise<void>;
 
   addMedicationGroup: (group: Omit<MedicationGroup, "id">) => Promise<void>;
   updateMedicationGroup: (id: string, updates: Partial<MedicationGroup>) => Promise<void>;
@@ -116,6 +128,18 @@ function isToday(dateStr: string): boolean {
   );
 }
 
+function migrateMedication(m: any): Medication {
+  return {
+    ...m,
+    status: m.status ?? "active",
+    bottleCount: m.bottleCount ?? m.totalCount ?? 30,
+    totalCount: m.totalCount ?? m.bottleCount ?? 30,
+    awaitingRefill: m.awaitingRefill ?? false,
+    brandName: m.brandName ?? undefined,
+    category: m.category ?? undefined,
+  };
+}
+
 const STORAGE_KEYS = {
   MEDICATIONS: "@healthtrack_medications",
   MED_GROUPS: "@healthtrack_med_groups",
@@ -147,7 +171,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_ROUTINES),
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_LOGS),
         ]);
-        if (meds) setMedications(JSON.parse(meds));
+        if (meds) setMedications((JSON.parse(meds) as any[]).map(migrateMedication));
         if (groups) setMedicationGroups(JSON.parse(groups));
         if (medLogs) setMedicationLogs(JSON.parse(medLogs));
         if (products) setSkincareProducts(JSON.parse(products));
@@ -190,7 +214,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     medicationId: string,
     groupId?: string,
     groupName?: string
-  ) => {
+  ): Promise<void> => {
     const now = new Date();
     setMedications(prevMeds => {
       const med = prevMeds.find(m => m.id === medicationId);
@@ -260,8 +284,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedications(prev => {
       const updated = prev.map(m =>
         m.id === medicationId
-          ? { ...m, remainingCount: m.remainingCount + amount, totalCount: m.totalCount + amount }
+          ? {
+              ...m,
+              remainingCount: m.remainingCount + amount,
+              bottleCount: amount,
+              totalCount: amount,
+              awaitingRefill: false,
+            }
           : m
+      );
+      AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const setRemainingCount = useCallback(async (id: string, count: number) => {
+    setMedications(prev => {
+      const updated = prev.map(m =>
+        m.id === id
+          ? { ...m, remainingCount: Math.max(0, count), awaitingRefill: count === 0 ? m.awaitingRefill : false }
+          : m
+      );
+      AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const archiveMedication = useCallback(async (id: string, mode: "storage" | "history") => {
+    setMedications(prev => {
+      const updated = prev.map(m =>
+        m.id === id
+          ? {
+              ...m,
+              status: mode as MedicationStatus,
+              remainingCount: mode === "history" ? 0 : m.remainingCount,
+              awaitingRefill: false,
+            }
+          : m
+      );
+      AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const unarchiveMedication = useCallback(async (id: string) => {
+    setMedications(prev => {
+      const updated = prev.map(m =>
+        m.id === id ? { ...m, status: "active" as MedicationStatus } : m
+      );
+      AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const setAwaitingRefill = useCallback(async (id: string, value: boolean) => {
+    setMedications(prev => {
+      const updated = prev.map(m =>
+        m.id === id ? { ...m, awaitingRefill: value } : m
       );
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
       return updated;
@@ -408,7 +487,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const getMedicationsNeedingRefill = useCallback((): Medication[] => {
     return medications.filter(
-      m => m.notifyLowStock && m.remainingCount <= m.lowStockThreshold
+      m => m.status === "active" && m.notifyLowStock && m.remainingCount <= m.lowStockThreshold
     );
   }, [medications]);
 
@@ -426,6 +505,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     logMedication,
     logMedicationGroup,
     refillMedication,
+    setRemainingCount,
+    archiveMedication,
+    unarchiveMedication,
+    setAwaitingRefill,
     addMedicationGroup,
     updateMedicationGroup,
     deleteMedicationGroup,

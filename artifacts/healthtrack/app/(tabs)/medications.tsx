@@ -18,6 +18,7 @@ import { MedicationCard } from "@/components/medications/MedicationCard";
 import { MedicationGroupCard } from "@/components/medications/MedicationGroupCard";
 import { AddMedicationModal } from "@/components/medications/AddMedicationModal";
 import { AddGroupModal } from "@/components/medications/AddGroupModal";
+import { UpdateCountModal } from "@/components/medications/UpdateCountModal";
 
 type TabType = "medications" | "groups";
 
@@ -30,38 +31,91 @@ export default function MedicationsScreen() {
     deleteMedication,
     deleteMedicationGroup,
     refillMedication,
+    archiveMedication,
+    unarchiveMedication,
+    setAwaitingRefill,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<TabType>("medications");
-  const [showAddMed, setShowAddMed] = useState(false);
-  const [showAddGroup, setShowAddGroup] = useState(false);
-  const [editMed, setEditMed] = useState<Medication | null>(null);
-  const [editGroup, setEditGroup] = useState<MedicationGroup | null>(null);
+  const [activeTab, setActiveTab]         = useState<TabType>("medications");
+  const [showAddMed, setShowAddMed]       = useState(false);
+  const [showAddGroup, setShowAddGroup]   = useState(false);
+  const [editMed, setEditMed]             = useState<Medication | null>(null);
+  const [editGroup, setEditGroup]         = useState<MedicationGroup | null>(null);
+  const [updateCountMed, setUpdateCountMed] = useState<Medication | null>(null);
+  const [archiveExpanded, setArchiveExpanded] = useState(false);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
-  const handleDeleteMed = (med: Medication) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert("Delete Medication", `Remove ${med.name}?`, [
+  const activeMeds   = medications.filter(m => m.status === "active");
+  const archivedMeds = medications.filter(m => m.status === "storage" || m.status === "history");
+
+  const handleMedLongPress = (med: Medication) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const isActive = med.status === "active";
+
+    if (!isActive) {
+      Alert.alert(med.name, `${med.status === "storage" ? "In Storage" : "History"} — what would you like to do?`, [
+        { text: "Restore to Active", onPress: () => unarchiveMedication(med.id) },
+        { text: "Delete Permanently", style: "destructive", onPress: () => confirmDelete(med) },
+        { text: "Cancel", style: "cancel" },
+      ]);
+      return;
+    }
+
+    const awaitingOptions = med.awaitingRefill
+      ? [{ text: "Cancel Await Refill", onPress: () => setAwaitingRefill(med.id, false) }]
+      : [];
+
+    Alert.alert(med.name, "What would you like to do?", [
+      { text: "Edit",          onPress: () => { setEditMed(med); setShowAddMed(true); } },
+      { text: "Update Count",  onPress: () => setUpdateCountMed(med) },
+      { text: "Refill",        onPress: () => handleRefill(med) },
+      { text: "Move to Storage", onPress: () => {
+          Alert.alert("Move to Storage?", `${med.name} will be marked inactive but kept in your list.`, [
+            { text: "Cancel", style: "cancel" },
+            { text: "Move to Storage", onPress: () => archiveMedication(med.id, "storage") },
+          ]);
+        }
+      },
+      { text: "Archive to History", style: "destructive", onPress: () => {
+          Alert.alert("Archive to History?", `${med.name} will be marked as no longer available. Remaining count will be set to 0.`, [
+            { text: "Cancel", style: "cancel" },
+            { text: "Archive", style: "destructive", onPress: () => archiveMedication(med.id, "history") },
+          ]);
+        }
+      },
+      ...awaitingOptions,
+      { text: "Delete",        style: "destructive", onPress: () => confirmDelete(med) },
+      { text: "Cancel",        style: "cancel" },
+    ]);
+  };
+
+  const confirmDelete = (med: Medication) => {
+    Alert.alert("Delete Medication", `Permanently remove ${med.name}? This cannot be undone.`, [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => deleteMedication(med.id) },
     ]);
   };
 
   const handleDeleteGroup = (group: MedicationGroup) => {
-    Alert.alert("Delete Group", `Remove ${group.name}?`, [
+    Alert.alert("Delete Group", `Remove "${group.name}"?`, [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => deleteMedicationGroup(group.id) },
     ]);
   };
 
   const handleRefill = (med: Medication) => {
-    Alert.alert("Refill Medication", `How many ${med.unit}s are you adding?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "30", onPress: () => refillMedication(med.id, 30) },
-      { text: "60", onPress: () => refillMedication(med.id, 60) },
-      { text: "90", onPress: () => refillMedication(med.id, 90) },
-    ]);
+    Alert.alert(
+      `Refill ${med.name}`,
+      `Current: ${med.remainingCount} · Bottle: ${med.bottleCount ?? med.totalCount}\nHow many are you adding?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "30",  onPress: () => refillMedication(med.id, 30) },
+        { text: "60",  onPress: () => refillMedication(med.id, 60) },
+        { text: "90",  onPress: () => refillMedication(med.id, 90) },
+        { text: "Custom", onPress: () => setUpdateCountMed(med) },
+      ]
+    );
   };
 
   return (
@@ -76,72 +130,99 @@ export default function MedicationsScreen() {
       >
         <View style={styles.headerSection}>
           <Text style={[styles.title, { color: colors.text }]}>Medications</Text>
-          <View style={styles.headerRight}>
-            <Pressable
-              style={[styles.addBtn, { backgroundColor: colors.tint }]}
-              onPress={() => activeTab === "medications" ? setShowAddMed(true) : setShowAddGroup(true)}
-            >
-              <Ionicons name="add" size={20} color="#fff" />
-            </Pressable>
-          </View>
+          <Pressable
+            style={[styles.addBtn, { backgroundColor: colors.tint }]}
+            onPress={() => activeTab === "medications" ? setShowAddMed(true) : setShowAddGroup(true)}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+          </Pressable>
         </View>
 
         <View style={[styles.segmentControl, { backgroundColor: colors.borderLight }]}>
-          <Pressable
-            style={[styles.segment, activeTab === "medications" && [styles.segmentActive, { backgroundColor: colors.card, shadowColor: colors.text }]]}
-            onPress={() => setActiveTab("medications")}
-          >
-            <Text style={[styles.segmentText, { color: activeTab === "medications" ? colors.text : colors.textSecondary }]}>
-              Individual
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segment, activeTab === "groups" && [styles.segmentActive, { backgroundColor: colors.card, shadowColor: colors.text }]]}
-            onPress={() => setActiveTab("groups")}
-          >
-            <Text style={[styles.segmentText, { color: activeTab === "groups" ? colors.text : colors.textSecondary }]}>
-              Groups
-            </Text>
-          </Pressable>
+          {(["medications", "groups"] as TabType[]).map(tab => (
+            <Pressable
+              key={tab}
+              style={[
+                styles.segment,
+                activeTab === tab && [styles.segmentActive, { backgroundColor: colors.card, shadowColor: colors.text }],
+              ]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.segmentText, { color: activeTab === tab ? colors.text : colors.textSecondary }]}>
+                {tab === "medications" ? "Individual" : "Groups"}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
         {activeTab === "medications" ? (
-          medications.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.tintLight }]}>
-                <Ionicons name="medkit" size={32} color={colors.tint} />
+          <>
+            {activeMeds.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIcon, { backgroundColor: colors.tintLight }]}>
+                  <Ionicons name="medkit" size={32} color={colors.tint} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No medications yet</Text>
+                <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
+                  Tap + to add your first medication
+                </Text>
+                <Pressable
+                  style={[styles.emptyBtn, { backgroundColor: colors.tint }]}
+                  onPress={() => setShowAddMed(true)}
+                >
+                  <Ionicons name="add" size={18} color="#fff" />
+                  <Text style={styles.emptyBtnText}>Add Medication</Text>
+                </Pressable>
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No medications yet</Text>
-              <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-                Tap + to add your first medication
-              </Text>
-              <Pressable
-                style={[styles.emptyBtn, { backgroundColor: colors.tint }]}
-                onPress={() => setShowAddMed(true)}
-              >
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text style={styles.emptyBtnText}>Add Medication</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.list}>
-              {medications.map(med => (
-                <MedicationCard
-                  key={med.id}
-                  medication={med}
-                  onLongPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    Alert.alert(med.name, "What would you like to do?", [
-                      { text: "Edit", onPress: () => { setEditMed(med); setShowAddMed(true); } },
-                      { text: "Refill", onPress: () => handleRefill(med) },
-                      { text: "Delete", style: "destructive", onPress: () => handleDeleteMed(med) },
-                      { text: "Cancel", style: "cancel" },
-                    ]);
+            ) : (
+              <View style={styles.list}>
+                {activeMeds.map(med => (
+                  <MedicationCard
+                    key={med.id}
+                    medication={med}
+                    onLongPress={() => handleMedLongPress(med)}
+                  />
+                ))}
+              </View>
+            )}
+
+            {archivedMeds.length > 0 && (
+              <View style={styles.archiveSection}>
+                <Pressable
+                  style={styles.archiveHeader}
+                  onPress={() => {
+                    setArchiveExpanded(v => !v);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }}
-                />
-              ))}
-            </View>
-          )
+                >
+                  <View style={styles.archiveHeaderLeft}>
+                    <Ionicons name="archive-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.archiveTitle, { color: colors.textSecondary }]}>
+                      Archived ({archivedMeds.length})
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={archiveExpanded ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color={colors.textTertiary}
+                  />
+                </Pressable>
+
+                {archiveExpanded && (
+                  <View style={styles.list}>
+                    {archivedMeds.map(med => (
+                      <MedicationCard
+                        key={med.id}
+                        medication={med}
+                        archived
+                        onLongPress={() => handleMedLongPress(med)}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+          </>
         ) : (
           medicationGroups.length === 0 ? (
             <View style={styles.emptyState}>
@@ -168,7 +249,7 @@ export default function MedicationsScreen() {
                   onLongPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     Alert.alert(group.name, "What would you like to do?", [
-                      { text: "Edit", onPress: () => { setEditGroup(group); setShowAddGroup(true); } },
+                      { text: "Edit",   onPress: () => { setEditGroup(group); setShowAddGroup(true); } },
                       { text: "Delete", style: "destructive", onPress: () => handleDeleteGroup(group) },
                       { text: "Cancel", style: "cancel" },
                     ]);
@@ -192,6 +273,11 @@ export default function MedicationsScreen() {
         onClose={() => { setShowAddGroup(false); setEditGroup(null); }}
         editGroup={editGroup}
       />
+      <UpdateCountModal
+        visible={!!updateCountMed}
+        medication={updateCountMed}
+        onClose={() => setUpdateCountMed(null)}
+      />
     </View>
   );
 }
@@ -200,24 +286,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 32, gap: 16 },
   headerSection: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingTop: 8,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8,
   },
   title: { fontSize: 32, fontFamily: "Inter_700Bold" },
-  headerRight: { flexDirection: "row", gap: 8 },
   addBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: "center", justifyContent: "center",
+    width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
   },
-  segmentControl: {
-    flexDirection: "row", borderRadius: 12, padding: 3, marginBottom: 4,
-  },
+  segmentControl: { flexDirection: "row", borderRadius: 12, padding: 3, marginBottom: 4 },
   segment: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 10 },
-  segmentActive: {
-    shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2,
-  },
+  segmentActive: { shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   segmentText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   list: { gap: 2 },
+
   emptyState: { alignItems: "center", paddingVertical: 50, gap: 12 },
   emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
   emptyTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
@@ -227,4 +307,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, marginTop: 4,
   },
   emptyBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  archiveSection: { marginTop: 8 },
+  archiveHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: 12, paddingHorizontal: 4, marginBottom: 6,
+  },
+  archiveHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  archiveTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });
