@@ -14,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Vital reads from Apple Health to show your health context alongside your medication logs.",
+        "NSHealthUpdateUsageDescription": "Vital writes medication dose events to Apple Health so your logs appear in your Health app timeline."
+      }
     },
     "android": {},
     "web": {
@@ -29,7 +33,13 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "@kingstinct/react-native-healthkit"
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Vital reads from Apple Health to show your health context alongside your medication logs.",
+          "NSHealthUpdateUsageDescription": "Vital writes medication dose events to Apple Health so your logs appear in your Health app timeline."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
