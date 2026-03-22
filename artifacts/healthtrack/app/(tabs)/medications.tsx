@@ -21,6 +21,7 @@ import { AddGroupModal } from "@/components/medications/AddGroupModal";
 import { UpdateCountModal } from "@/components/medications/UpdateCountModal";
 import { InteractionsBanner } from "@/components/medications/InteractionsBanner";
 import { checkAllInteractions, DrugInteraction } from "@/utils/drugInteractions";
+import { IconColorSheet } from "@/components/ui/IconColorSheet";
 
 const COLOR_ORDER = [
   "#34C78B", "#FF6B6B", "#007AFF", "#FF9F0A",
@@ -47,6 +48,7 @@ export default function MedicationsScreen() {
     unarchiveMedication,
     setAwaitingRefill,
     reorderMedications,
+    updateMedication,
     userProfile,
   } = useApp();
 
@@ -58,6 +60,7 @@ export default function MedicationsScreen() {
   const [updateCountMed, setUpdateCountMed] = useState<Medication | null>(null);
   const [archiveExpanded, setArchiveExpanded] = useState(false);
   const [reorderMode, setReorderMode]     = useState(false);
+  const [editAppearanceMed, setEditAppearanceMed] = useState<Medication | null>(null);
 
   const [interactionsLoading, setInteractionsLoading] = useState(false);
   const [interactions, setInteractions]   = useState<DrugInteraction[]>([]);
@@ -318,6 +321,7 @@ export default function MedicationsScreen() {
                       onMoveDown={() => moveDown(idx)}
                       isFirst={idx === 0}
                       isLast={idx === sortedActiveMeds.length - 1}
+                      onEditAppearance={() => setEditAppearanceMed(med)}
                     />
                   ))}
                 </View>
@@ -415,6 +419,25 @@ export default function MedicationsScreen() {
         visible={!!updateCountMed}
         medication={updateCountMed}
         onClose={() => setUpdateCountMed(null)}
+      />
+      <IconColorSheet
+        visible={!!editAppearanceMed}
+        onClose={() => setEditAppearanceMed(null)}
+        selectedIcon={editAppearanceMed?.icon ?? "mci:pill"}
+        selectedColor={editAppearanceMed?.color ?? "#34C78B"}
+        onIconChange={async (icon) => {
+          if (editAppearanceMed) {
+            await updateMedication(editAppearanceMed.id, { icon });
+            setEditAppearanceMed(prev => prev ? { ...prev, icon } : null);
+          }
+        }}
+        onColorChange={async (color) => {
+          if (editAppearanceMed) {
+            await updateMedication(editAppearanceMed.id, { color });
+            setEditAppearanceMed(prev => prev ? { ...prev, color } : null);
+          }
+        }}
+        type="medication"
       />
     </View>
   );

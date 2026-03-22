@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -17,8 +17,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SkincareProduct, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { IconColorSheet, SHARED_COLORS } from "@/components/ui/IconColorSheet";
 
-const COLORS = ["#FF6B6B", "#FF9F0A", "#34C78B", "#007AFF", "#AF52DE", "#FF6CBF", "#5AC8FA", "#FF8C42"];
 const PRODUCT_TYPES = [
   "Cleanser", "Toner", "Serum", "Moisturizer", "Sunscreen",
   "Eye Cream", "Mask", "Exfoliant", "Oil", "Mist", "Tool", "Other"
@@ -35,16 +36,28 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
   const { addSkincareProduct, updateSkincareProduct } = useApp();
   const insets = useSafeAreaInsets();
 
-  const [name, setName] = useState(editProduct?.name || "");
-  const [brand, setBrand] = useState(editProduct?.brand || "");
-  const [type, setType] = useState(editProduct?.type || "Serum");
-  const [selectedColor, setSelectedColor] = useState(editProduct?.color || COLORS[0]);
+  const [name, setName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [type, setType] = useState("Serum");
+  const [selectedColor, setSelectedColor] = useState(SHARED_COLORS[0]);
+  const [selectedIcon, setSelectedIcon] = useState("mci:bottle-tonic");
+  const [showIconPicker, setShowIconPicker] = useState(false);
 
-  const reset = () => {
-    if (!editProduct) {
-      setName(""); setBrand(""); setType("Serum"); setSelectedColor(COLORS[0]);
+  useEffect(() => {
+    if (visible) {
+      if (editProduct) {
+        setName(editProduct.name);
+        setBrand(editProduct.brand);
+        setType(editProduct.type);
+        setSelectedColor(editProduct.color);
+        setSelectedIcon(editProduct.icon ?? "mci:bottle-tonic");
+      } else {
+        setName(""); setBrand(""); setType("Serum");
+        setSelectedColor(SHARED_COLORS[0]);
+        setSelectedIcon("mci:bottle-tonic");
+      }
     }
-  };
+  }, [visible, editProduct]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -58,6 +71,7 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
         brand: brand.trim(),
         type,
         color: selectedColor,
+        icon: selectedIcon,
       });
     } else {
       await addSkincareProduct({
@@ -65,9 +79,9 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
         brand: brand.trim(),
         type,
         color: selectedColor,
+        icon: selectedIcon,
       });
     }
-    reset();
     onClose();
   };
 
@@ -121,7 +135,10 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
               {PRODUCT_TYPES.map(t => (
                 <Pressable
                   key={t}
-                  onPress={() => setType(t)}
+                  onPress={() => {
+                    setType(t);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
                   style={[
                     styles.typeChip,
                     {
@@ -136,26 +153,38 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
             </View>
           </View>
 
+          {/* Appearance */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>COLOR</Text>
-            <View style={styles.colorRow}>
-              {COLORS.map(c => (
-                <Pressable
-                  key={c}
-                  onPress={() => setSelectedColor(c)}
-                  style={[
-                    styles.colorDot,
-                    { backgroundColor: c },
-                    selectedColor === c && styles.colorDotSelected,
-                  ]}
-                >
-                  {selectedColor === c && <Ionicons name="checkmark" size={14} color="#fff" />}
-                </Pressable>
-              ))}
-            </View>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>APPEARANCE</Text>
+            <Pressable
+              style={[styles.appearanceBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => setShowIconPicker(true)}
+            >
+              <View style={[styles.appearancePreview, { backgroundColor: `${selectedColor}22` }]}>
+                <AppIcon icon={selectedIcon} size={28} color={selectedColor} />
+              </View>
+              <View style={styles.appearanceInfo}>
+                <Text style={[styles.appearanceLabel, { color: colors.text }]}>Icon & Color</Text>
+                <Text style={[styles.appearanceHint, { color: colors.textSecondary }]}>
+                  Tap to choose icon and color
+                </Text>
+              </View>
+              <View style={[styles.colorSwatch, { backgroundColor: selectedColor }]} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <IconColorSheet
+        visible={showIconPicker}
+        onClose={() => setShowIconPicker(false)}
+        selectedIcon={selectedIcon}
+        selectedColor={selectedColor}
+        onIconChange={setSelectedIcon}
+        onColorChange={setSelectedColor}
+        type="skincare"
+      />
     </Modal>
   );
 }
@@ -182,11 +211,20 @@ const styles = StyleSheet.create({
   typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, borderWidth: 1 },
   typeText: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  colorRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  colorDot: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  colorDotSelected: {
-    transform: [{ scale: 1.15 }],
-    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 }, elevation: 4,
+  appearanceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
   },
+  appearancePreview: {
+    width: 52, height: 52, borderRadius: 26,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  appearanceInfo: { flex: 1 },
+  appearanceLabel: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  appearanceHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  colorSwatch: { width: 22, height: 22, borderRadius: 11 },
 });
