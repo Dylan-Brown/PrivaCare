@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Alert,
   Platform,
@@ -20,6 +20,16 @@ import { AddMedicationModal } from "@/components/medications/AddMedicationModal"
 import { AddGroupModal } from "@/components/medications/AddGroupModal";
 import { UpdateCountModal } from "@/components/medications/UpdateCountModal";
 
+const COLOR_ORDER = [
+  "#34C78B", "#FF6B6B", "#007AFF", "#FF9F0A",
+  "#AF52DE", "#FF6CBF", "#5AC8FA", "#4CD964",
+];
+
+function colorSortKey(color: string): number {
+  const idx = COLOR_ORDER.indexOf(color);
+  return idx === -1 ? COLOR_ORDER.length : idx;
+}
+
 type TabType = "medications" | "groups";
 
 export default function MedicationsScreen() {
@@ -34,6 +44,7 @@ export default function MedicationsScreen() {
     archiveMedication,
     unarchiveMedication,
     setAwaitingRefill,
+    reorderMedications,
   } = useApp();
 
   const [activeTab, setActiveTab]         = useState<TabType>("medications");
@@ -43,13 +54,44 @@ export default function MedicationsScreen() {
   const [editGroup, setEditGroup]         = useState<MedicationGroup | null>(null);
   const [updateCountMed, setUpdateCountMed] = useState<Medication | null>(null);
   const [archiveExpanded, setArchiveExpanded] = useState(false);
+  const [reorderMode, setReorderMode]     = useState(false);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   const activeMeds   = medications.filter(m => m.status === "active");
   const archivedMeds = medications.filter(m => m.status === "storage" || m.status === "history");
 
+  const allHaveSortOrder = activeMeds.every(m => m.sortOrder !== undefined);
+
+  const sortedActiveMeds = useMemo(() => {
+    return [...activeMeds].sort((a, b) => {
+      if (allHaveSortOrder) {
+        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      }
+      const colorDiff = colorSortKey(a.color) - colorSortKey(b.color);
+      if (colorDiff !== 0) return colorDiff;
+      return a.name.localeCompare(b.name);
+    });
+  }, [activeMeds, allHaveSortOrder]);
+
+  const moveUp = (idx: number) => {
+    if (idx === 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const ids = sortedActiveMeds.map(m => m.id);
+    [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+    reorderMedications(ids);
+  };
+
+  const moveDown = (idx: number) => {
+    if (idx === sortedActiveMeds.length - 1) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const ids = sortedActiveMeds.map(m => m.id);
+    [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+    reorderMedications(ids);
+  };
+
   const handleMedLongPress = (med: Medication) => {
+    if (reorderMode) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const isActive = med.status === "active";
 
@@ -130,12 +172,40 @@ export default function MedicationsScreen() {
       >
         <View style={styles.headerSection}>
           <Text style={[styles.title, { color: colors.text }]}>Medications</Text>
-          <Pressable
-            style={[styles.addBtn, { backgroundColor: colors.tint }]}
-            onPress={() => activeTab === "medications" ? setShowAddMed(true) : setShowAddGroup(true)}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-          </Pressable>
+          <View style={styles.headerActions}>
+            {activeTab === "medications" && activeMeds.length > 1 && (
+              <Pressable
+                style={[
+                  styles.reorderToggle,
+                  {
+                    backgroundColor: reorderMode ? colors.tint : colors.borderLight,
+                    borderColor: reorderMode ? colors.tint : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setReorderMode(v => !v);
+                }}
+              >
+                <Ionicons
+                  name={reorderMode ? "checkmark" : "swap-vertical-outline"}
+                  size={16}
+                  color={reorderMode ? "#fff" : colors.textSecondary}
+                />
+                <Text style={[styles.reorderToggleText, { color: reorderMode ? "#fff" : colors.textSecondary }]}>
+                  {reorderMode ? "Done" : "Reorder"}
+                </Text>
+              </Pressable>
+            )}
+            {!reorderMode && (
+              <Pressable
+                style={[styles.addBtn, { backgroundColor: colors.tint }]}
+                onPress={() => activeTab === "medications" ? setShowAddMed(true) : setShowAddGroup(true)}
+              >
+                <Ionicons name="add" size={20} color="#fff" />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         <View style={[styles.segmentControl, { backgroundColor: colors.borderLight }]}>
@@ -146,7 +216,10 @@ export default function MedicationsScreen() {
                 styles.segment,
                 activeTab === tab && [styles.segmentActive, { backgroundColor: colors.card, shadowColor: colors.text }],
               ]}
-              onPress={() => setActiveTab(tab)}
+              onPress={() => {
+                setActiveTab(tab);
+                setReorderMode(false);
+              }}
             >
               <Text style={[styles.segmentText, { color: activeTab === tab ? colors.text : colors.textSecondary }]}>
                 {tab === "medications" ? "Individual" : "Groups"}
@@ -175,18 +248,33 @@ export default function MedicationsScreen() {
                 </Pressable>
               </View>
             ) : (
-              <View style={styles.list}>
-                {activeMeds.map(med => (
-                  <MedicationCard
-                    key={med.id}
-                    medication={med}
-                    onLongPress={() => handleMedLongPress(med)}
-                  />
-                ))}
-              </View>
+              <>
+                {reorderMode && (
+                  <View style={[styles.reorderHint, { backgroundColor: colors.tintLight, borderColor: `${colors.tint}30` }]}>
+                    <Ionicons name="information-circle-outline" size={15} color={colors.tint} />
+                    <Text style={[styles.reorderHintText, { color: colors.tint }]}>
+                      Use the arrows to change the order. Tap Done when finished.
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.list}>
+                  {sortedActiveMeds.map((med, idx) => (
+                    <MedicationCard
+                      key={med.id}
+                      medication={med}
+                      onLongPress={() => handleMedLongPress(med)}
+                      reorderMode={reorderMode}
+                      onMoveUp={() => moveUp(idx)}
+                      onMoveDown={() => moveDown(idx)}
+                      isFirst={idx === 0}
+                      isLast={idx === sortedActiveMeds.length - 1}
+                    />
+                  ))}
+                </View>
+              </>
             )}
 
-            {archivedMeds.length > 0 && (
+            {archivedMeds.length > 0 && !reorderMode && (
               <View style={styles.archiveSection}>
                 <Pressable
                   style={styles.archiveHeader}
@@ -289,9 +377,20 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8,
   },
   title: { fontSize: 32, fontFamily: "Inter_700Bold" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  reorderToggle: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
+  },
+  reorderToggleText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   addBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
   },
+  reorderHint: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1,
+  },
+  reorderHintText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 18 },
   segmentControl: { flexDirection: "row", borderRadius: 12, padding: 3, marginBottom: 4 },
   segment: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 10 },
   segmentActive: { shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },

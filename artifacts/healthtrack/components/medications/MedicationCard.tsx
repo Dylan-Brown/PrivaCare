@@ -31,9 +31,25 @@ type Props = {
   onLongPress?: () => void;
   compact?: boolean;
   archived?: boolean;
+  reorderMode?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 };
 
-export function MedicationCard({ medication, onPress, onLongPress, compact = false, archived = false }: Props) {
+export function MedicationCard({
+  medication,
+  onPress,
+  onLongPress,
+  compact = false,
+  archived = false,
+  reorderMode = false,
+  onMoveUp,
+  onMoveDown,
+  isFirst = false,
+  isLast = false,
+}: Props) {
   const { colors } = useTheme();
   const { logMedication, archiveMedication, setAwaitingRefill } = useApp();
   const scale      = useSharedValue(1);
@@ -50,6 +66,7 @@ export function MedicationCard({ medication, onPress, onLongPress, compact = fal
   const isArchived     = archived || medication.status === "storage" || medication.status === "history";
   const accentColor    = isArchived ? colors.textTertiary : (medication.color || colors.tint);
   const catInfo        = medication.category ? CATEGORY_LABELS[medication.category] : null;
+  const hasIngredients = medication.isCompound && medication.ingredients && medication.ingredients.length > 0;
 
   const showZeroAlert = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -111,6 +128,54 @@ export function MedicationCard({ medication, onPress, onLongPress, compact = fal
     }
   };
 
+  if (reorderMode) {
+    return (
+      <Animated.View style={animStyle}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.colorBar, { backgroundColor: accentColor }]} />
+          <View style={[styles.content, styles.reorderContent]}>
+            <Ionicons name="reorder-three-outline" size={22} color={colors.textTertiary} />
+            <View style={styles.reorderInfo}>
+              <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+                {medication.name}
+              </Text>
+              {medication.isCompound && (
+                <Text style={[styles.compoundHint, { color: accentColor }]}>Compound</Text>
+              )}
+              <Text style={[styles.dosage, { color: colors.textSecondary }]} numberOfLines={1}>
+                {medication.dosage} {!medication.isCompound ? medication.unit : ""}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.reorderBtns}>
+            <Pressable
+              style={[styles.reorderBtn, isFirst && styles.reorderBtnDisabled]}
+              onPress={isFirst ? undefined : onMoveUp}
+              disabled={isFirst}
+            >
+              <Ionicons
+                name="chevron-up"
+                size={20}
+                color={isFirst ? colors.textTertiary : colors.text}
+              />
+            </Pressable>
+            <Pressable
+              style={[styles.reorderBtn, isLast && styles.reorderBtnDisabled]}
+              onPress={isLast ? undefined : onMoveDown}
+              disabled={isLast}
+            >
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={isLast ? colors.textTertiary : colors.text}
+              />
+            </Pressable>
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View style={animStyle}>
       <Pressable
@@ -131,7 +196,15 @@ export function MedicationCard({ medication, onPress, onLongPress, compact = fal
           <View style={styles.top}>
             <View style={[styles.iconCircle, { backgroundColor: `${accentColor}18` }]}>
               <Ionicons
-                name={isArchived ? (medication.status === "storage" ? "archive" : "time") : "medkit"}
+                name={
+                  medication.isCompound
+                    ? "layers"
+                    : isArchived
+                    ? medication.status === "storage"
+                      ? "archive"
+                      : "time"
+                    : "medkit"
+                }
                 size={compact ? 16 : 18}
                 color={accentColor}
               />
@@ -141,7 +214,13 @@ export function MedicationCard({ medication, onPress, onLongPress, compact = fal
                 <Text style={[styles.name, { color: isArchived ? colors.textSecondary : colors.text }]} numberOfLines={1}>
                   {medication.name}
                 </Text>
-                {catInfo && !compact && (
+                {medication.isCompound && !compact && (
+                  <View style={[styles.compoundBadge, { backgroundColor: `${accentColor}18` }]}>
+                    <Ionicons name="layers" size={10} color={accentColor} />
+                    <Text style={[styles.compoundBadgeText, { color: accentColor }]}>Compound</Text>
+                  </View>
+                )}
+                {catInfo && !compact && !medication.isCompound && (
                   <View style={[styles.catBadge, { backgroundColor: `${catInfo.color}18` }]}>
                     <Text style={[styles.catText, { color: catInfo.color }]}>{catInfo.label}</Text>
                   </View>
@@ -153,10 +232,25 @@ export function MedicationCard({ medication, onPress, onLongPress, compact = fal
                 </Text>
               ) : null}
               <Text style={[styles.dosage, { color: colors.textSecondary }]}>
-                {medication.dosage} {medication.unit}
+                {medication.dosage}{medication.dosage && !medication.isCompound ? ` ${medication.unit}` : ""}
                 {isArchived && medication.status === "storage" ? " · In Storage" : ""}
                 {isArchived && medication.status === "history" ? " · History" : ""}
               </Text>
+
+              {hasIngredients && !compact && (
+                <View style={styles.ingredientList}>
+                  {medication.ingredients!.slice(0, 3).map((ing, idx) => (
+                    <Text key={idx} style={[styles.ingredientItem, { color: colors.textTertiary }]}>
+                      · {ing.name}{ing.amount ? ` ${ing.amount}${ing.unit}` : ""}
+                    </Text>
+                  ))}
+                  {medication.ingredients!.length > 3 && (
+                    <Text style={[styles.ingredientItem, { color: colors.textTertiary }]}>
+                      · +{medication.ingredients!.length - 3} more
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
             <View style={styles.right}>
               {isLow && (
@@ -219,7 +313,7 @@ const styles = StyleSheet.create({
   compact: { marginBottom: 6 },
   colorBar: { width: 4 },
   content: { flex: 1, padding: 14 },
-  top: { flexDirection: "row", alignItems: "center", gap: 10 },
+  top: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   iconCircle: {
     width: 38, height: 38, borderRadius: 19,
     alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -229,14 +323,17 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontFamily: "Inter_600SemiBold", marginBottom: 1 },
   brandName: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 1 },
   dosage: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  catBadge: {
+  compoundBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
   },
+  compoundBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  catBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   catText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  ingredientList: { marginTop: 5, gap: 1 },
+  ingredientItem: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
   right: { alignItems: "flex-end", gap: 4 },
-  awaitingBadge: {
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-  },
+  awaitingBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   awaitingText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   actions: { marginTop: 12, flexDirection: "row", gap: 8 },
   logBtn: {
@@ -244,4 +341,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1,
   },
   logBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  reorderContent: { flexDirection: "row", alignItems: "center", gap: 10 },
+  reorderInfo: { flex: 1 },
+  compoundHint: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginBottom: 1 },
+  reorderBtns: { flexDirection: "column", paddingRight: 6, paddingVertical: 4 },
+  reorderBtn: { padding: 8 },
+  reorderBtnDisabled: { opacity: 0.25 },
 });

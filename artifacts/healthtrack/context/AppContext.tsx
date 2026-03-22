@@ -11,6 +11,12 @@ import { logMedicationDoseToHealthKit } from "@/utils/healthKit";
 export type MedicationStatus = "active" | "storage" | "history";
 export type MedicationCategory = "prescription" | "generic" | "supplement";
 
+export type CompoundIngredient = {
+  name: string;
+  amount: string;
+  unit: string;
+};
+
 export type Medication = {
   id: string;
   name: string;
@@ -27,6 +33,9 @@ export type Medication = {
   status: MedicationStatus;
   awaitingRefill?: boolean;
   category?: MedicationCategory;
+  isCompound?: boolean;
+  ingredients?: CompoundIngredient[];
+  sortOrder?: number;
 };
 
 export type MedicationGroup = {
@@ -94,6 +103,7 @@ type AppContextType = {
   archiveMedication: (id: string, mode: "storage" | "history") => Promise<void>;
   unarchiveMedication: (id: string) => Promise<void>;
   setAwaitingRefill: (id: string, value: boolean) => Promise<void>;
+  reorderMedications: (orderedIds: string[]) => Promise<void>;
 
   addMedicationGroup: (group: Omit<MedicationGroup, "id">) => Promise<void>;
   updateMedicationGroup: (id: string, updates: Partial<MedicationGroup>) => Promise<void>;
@@ -128,7 +138,7 @@ function isToday(dateStr: string): boolean {
   );
 }
 
-function migrateMedication(m: any): Medication {
+function migrateMedication(m: any, index: number): Medication {
   return {
     ...m,
     status: m.status ?? "active",
@@ -137,6 +147,9 @@ function migrateMedication(m: any): Medication {
     awaitingRefill: m.awaitingRefill ?? false,
     brandName: m.brandName ?? undefined,
     category: m.category ?? undefined,
+    isCompound: m.isCompound ?? false,
+    ingredients: m.ingredients ?? [],
+    sortOrder: m.sortOrder ?? index,
   };
 }
 
@@ -171,7 +184,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_ROUTINES),
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_LOGS),
         ]);
-        if (meds) setMedications((JSON.parse(meds) as any[]).map(migrateMedication));
+        if (meds) setMedications((JSON.parse(meds) as any[]).map((m, i) => migrateMedication(m, i)));
         if (groups) setMedicationGroups(JSON.parse(groups));
         if (medLogs) setMedicationLogs(JSON.parse(medLogs));
         if (products) setSkincareProducts(JSON.parse(products));
@@ -188,7 +201,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addMedication = useCallback(async (med: Omit<Medication, "id">) => {
     const newMed: Medication = { ...med, id: generateId() };
     setMedications(prev => {
-      const updated = [...prev, newMed];
+      const updated = [...prev, { ...newMed, sortOrder: prev.length }];
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
       return updated;
     });
@@ -342,6 +355,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updated = prev.map(m =>
         m.id === id ? { ...m, awaitingRefill: value } : m
       );
+      AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const reorderMedications = useCallback(async (orderedIds: string[]) => {
+    setMedications(prev => {
+      const map = new Map(prev.map(m => [m.id, m]));
+      const reordered = orderedIds
+        .map((id, idx) => {
+          const m = map.get(id);
+          return m ? { ...m, sortOrder: idx } : null;
+        })
+        .filter(Boolean) as Medication[];
+      const rest = prev.filter(m => !orderedIds.includes(m.id));
+      const updated = [...reordered, ...rest];
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
       return updated;
     });
@@ -509,6 +538,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     archiveMedication,
     unarchiveMedication,
     setAwaitingRefill,
+    reorderMedications,
     addMedicationGroup,
     updateMedicationGroup,
     deleteMedicationGroup,

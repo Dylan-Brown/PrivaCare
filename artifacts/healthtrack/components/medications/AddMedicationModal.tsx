@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,21 +10,27 @@ import {
   Text,
   TextInput,
   View,
+  Alert,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Medication, MedicationCategory, useApp } from "@/context/AppContext";
+import { CompoundIngredient, Medication, MedicationCategory, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 
 const COLORS = ["#34C78B", "#FF6B6B", "#007AFF", "#FF9F0A", "#AF52DE", "#FF6CBF", "#5AC8FA", "#4CD964"];
-const UNITS = ["mg", "ml", "tablet", "capsule", "drops", "IU", "mcg", "g"];
+const UNITS  = ["mg", "ml", "tablet", "capsule", "drops", "IU", "mcg", "g"];
 
 const CATEGORIES: { key: MedicationCategory; label: string; icon: string }[] = [
   { key: "prescription", label: "Prescription", icon: "medical" },
   { key: "generic",      label: "Generic",      icon: "flask" },
   { key: "supplement",   label: "Supplement",   icon: "leaf" },
+];
+
+const DEFAULT_INGREDIENTS: CompoundIngredient[] = [
+  { name: "", amount: "", unit: "mg" },
+  { name: "", amount: "", unit: "mg" },
 ];
 
 type Props = {
@@ -49,6 +54,8 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
   const [notifyLow, setNotifyLow]     = useState(true);
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
   const [category, setCategory]       = useState<MedicationCategory | undefined>(undefined);
+  const [isCompound, setIsCompound]   = useState(false);
+  const [ingredients, setIngredients] = useState<CompoundIngredient[]>(DEFAULT_INGREDIENTS);
 
   useEffect(() => {
     if (visible) {
@@ -63,11 +70,18 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         setNotifyLow(editMed.notifyLowStock);
         setSelectedColor(editMed.color);
         setCategory(editMed.category);
+        setIsCompound(editMed.isCompound ?? false);
+        setIngredients(
+          editMed.ingredients && editMed.ingredients.length >= 2
+            ? editMed.ingredients
+            : DEFAULT_INGREDIENTS
+        );
       } else {
         setName(""); setBrandName(""); setDosage(""); setUnit("mg");
         setBottleCount("30"); setRemaining("30");
         setLowThreshold("10"); setNotifyLow(true);
         setSelectedColor(COLORS[0]); setCategory(undefined);
+        setIsCompound(false); setIngredients(DEFAULT_INGREDIENTS);
       }
     }
   }, [visible, editMed]);
@@ -77,14 +91,50 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
     setBottleCount(bottle);
   };
 
+  const toggleCompound = (val: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsCompound(val);
+    if (val && ingredients.length < 2) {
+      setIngredients(DEFAULT_INGREDIENTS);
+    }
+  };
+
+  const updateIngredient = (index: number, field: keyof CompoundIngredient, value: string) => {
+    setIngredients(prev => prev.map((ing, i) => i === index ? { ...ing, [field]: value } : ing));
+  };
+
+  const addIngredient = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIngredients(prev => [...prev, { name: "", amount: "", unit: "mg" }]);
+  };
+
+  const removeIngredient = (index: number) => {
+    if (ingredients.length <= 2) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIngredients(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert("Required", "Please enter a medication name.");
       return;
     }
+
+    if (isCompound) {
+      const hasValidIngredients = ingredients.some(ing => ing.name.trim());
+      if (!hasValidIngredients) {
+        Alert.alert("Required", "Please enter at least one ingredient name.");
+        return;
+      }
+    }
+
     const bottle    = Math.max(1, parseInt(bottleCount) || 30);
     const rem       = Math.max(0, parseInt(remaining) || 0);
     const threshold = parseInt(lowThreshold) || 10;
+
+    const cleanIngredients = isCompound
+      ? ingredients.filter(ing => ing.name.trim() || ing.amount.trim())
+      : [];
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -101,6 +151,8 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         notifyLowStock: notifyLow,
         color: selectedColor,
         category,
+        isCompound,
+        ingredients: cleanIngredients,
       });
     } else {
       await addMedication({
@@ -117,6 +169,8 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         status: "active",
         awaitingRefill: false,
         category,
+        isCompound,
+        ingredients: cleanIngredients,
       });
     }
     onClose();
@@ -203,35 +257,147 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
             </View>
           </View>
 
-          {/* Dosage + Unit */}
+          {/* Compound toggle */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>DOSAGE AMOUNT</Text>
+            <View style={styles.switchRow}>
+              <View style={styles.switchInfo}>
+                <View style={styles.compoundLabelRow}>
+                  <Ionicons name="layers-outline" size={16} color={isCompound ? selectedColor : colors.textSecondary} />
+                  <Text style={[styles.switchLabel, { color: colors.text }]}>Compound Medication</Text>
+                </View>
+                <Text style={[styles.switchSub, { color: colors.textSecondary }]}>
+                  Has multiple active ingredients (e.g. Motrin Dual Action)
+                </Text>
+              </View>
+              <Switch
+                value={isCompound}
+                onValueChange={toggleCompound}
+                trackColor={{ false: colors.border, true: selectedColor }}
+                thumbColor="#fff"
+                ios_backgroundColor={colors.border}
+              />
+            </View>
+
+            {isCompound && (
+              <>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>INGREDIENTS</Text>
+                <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>
+                  Enter each active ingredient and its per-dose amount
+                </Text>
+
+                {ingredients.map((ing, idx) => (
+                  <View key={idx} style={[styles.ingredientRow, { borderColor: colors.border }]}>
+                    <View style={styles.ingredientHeader}>
+                      <Text style={[styles.ingredientLabel, { color: colors.textSecondary }]}>
+                        Ingredient {idx + 1}
+                      </Text>
+                      {ingredients.length > 2 && (
+                        <Pressable onPress={() => removeIngredient(idx)} style={styles.removeBtn}>
+                          <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+                        </Pressable>
+                      )}
+                    </View>
+                    <TextInput
+                      style={[styles.ingredientInput, { color: colors.text, borderColor: colors.border }]}
+                      placeholder="Ingredient name (e.g. Ibuprofen)"
+                      placeholderTextColor={colors.textTertiary}
+                      value={ing.name}
+                      onChangeText={v => updateIngredient(idx, "name", v)}
+                    />
+                    <View style={styles.ingredientAmountRow}>
+                      <TextInput
+                        style={[styles.ingredientAmountInput, { color: colors.text, borderColor: colors.border }]}
+                        placeholder="Amount"
+                        placeholderTextColor={colors.textTertiary}
+                        value={ing.amount}
+                        onChangeText={v => updateIngredient(idx, "amount", v)}
+                        keyboardType="decimal-pad"
+                      />
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.ingredientUnitScroll}
+                        contentContainerStyle={styles.ingredientUnitContent}
+                      >
+                        {UNITS.map(u => (
+                          <Pressable
+                            key={u}
+                            onPress={() => updateIngredient(idx, "unit", u)}
+                            style={[
+                              styles.ingredientUnitChip,
+                              {
+                                backgroundColor: ing.unit === u ? selectedColor : colors.borderLight,
+                                borderColor: ing.unit === u ? selectedColor : colors.border,
+                              },
+                            ]}
+                          >
+                            <Text style={[
+                              styles.ingredientUnitText,
+                              { color: ing.unit === u ? "#fff" : colors.text },
+                            ]}>
+                              {u}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                ))}
+
+                <Pressable
+                  onPress={addIngredient}
+                  style={[styles.addIngredientBtn, { borderColor: selectedColor }]}
+                >
+                  <Ionicons name="add" size={18} color={selectedColor} />
+                  <Text style={[styles.addIngredientText, { color: selectedColor }]}>
+                    Add Ingredient
+                  </Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+
+          {/* Dosage + Unit (overall dose for compound, or sole dosage) */}
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {isCompound ? "TOTAL DOSE LABEL (OPTIONAL)" : "DOSAGE AMOUNT"}
+            </Text>
+            {isCompound && (
+              <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>
+                Overall dose label shown on the card (e.g. "1 tablet")
+              </Text>
+            )}
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. 10"
+              placeholder={isCompound ? "e.g. 1 tablet" : "e.g. 10"}
               placeholderTextColor={colors.textTertiary}
               value={dosage}
               onChangeText={setDosage}
-              keyboardType="decimal-pad"
+              keyboardType={isCompound ? "default" : "decimal-pad"}
             />
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: 14 }]}>UNIT</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll}>
-              {UNITS.map(u => (
-                <Pressable
-                  key={u}
-                  onPress={() => setUnit(u)}
-                  style={[
-                    styles.unitChip,
-                    {
-                      backgroundColor: unit === u ? selectedColor : colors.borderLight,
-                      borderColor: unit === u ? selectedColor : colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.unitText, { color: unit === u ? "#fff" : colors.text }]}>{u}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+            {!isCompound && (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: 14 }]}>UNIT</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll}>
+                  {UNITS.map(u => (
+                    <Pressable
+                      key={u}
+                      onPress={() => setUnit(u)}
+                      style={[
+                        styles.unitChip,
+                        {
+                          backgroundColor: unit === u ? selectedColor : colors.borderLight,
+                          borderColor: unit === u ? selectedColor : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.unitText, { color: unit === u ? "#fff" : colors.text }]}>{u}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </>
+            )}
           </View>
 
           {/* Pill Count */}
@@ -342,6 +508,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100, borderWidth: 1,
   },
   categoryText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+
+  compoundLabelRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+
+  ingredientRow: {
+    borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10,
+  },
+  ingredientHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
+  },
+  ingredientLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.6 },
+  removeBtn: { padding: 2 },
+  ingredientInput: {
+    fontSize: 15, fontFamily: "Inter_400Regular",
+    borderBottomWidth: 1, paddingVertical: 6, marginBottom: 10,
+  },
+  ingredientAmountRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  ingredientAmountInput: {
+    fontSize: 15, fontFamily: "Inter_400Regular",
+    borderBottomWidth: 1, paddingVertical: 6,
+    width: 80,
+  },
+  ingredientUnitScroll: { flex: 1 },
+  ingredientUnitContent: { gap: 6, paddingRight: 4 },
+  ingredientUnitChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, borderWidth: 1,
+  },
+  ingredientUnitText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+
+  addIngredientBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, borderWidth: 1.5, borderStyle: "dashed",
+    borderRadius: 10, paddingVertical: 10, marginTop: 4,
+  },
+  addIngredientText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   unitScroll: { marginHorizontal: -4 },
   unitChip: {

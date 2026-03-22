@@ -22,7 +22,13 @@
     },
     "android": {},
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon.png",
+      "name": "Vital – Health Tracker",
+      "shortName": "Vital",
+      "description": "Personal health tracking for medications and skincare routines.",
+      "themeColor": "#34C78B",
+      "backgroundColor": "#ffffff",
+      "lang": "en"
     },
     "plugins": [
       [

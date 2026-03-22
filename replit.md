@@ -42,13 +42,16 @@ An iOS-first personal health tracking app built with Expo React Native.
 
 ### Features
 - **Medications**: Add/edit/delete medications with dosage, unit, pill count tracking
+- **Compound Medications**: Mark a medication as compound (multiple ingredients), enter per-ingredient name + amount + unit; unlimited ingredients via + button; defaults to 2 fields; compound badge shown on card
 - **Low Stock Alerts**: Configurable thresholds (e.g., alert when < 10 pills remain)
 - **Medication Groups**: Group medications by time (morning, evening, etc.) for one-tap logging
+- **Medication Reordering**: "Reorder" mode with up/down arrows; default sort = color order then name; `sortOrder` field persisted per medication; `reorderMedications()` in context
 - **Skincare Products**: Add/edit/delete products with type (cleanser, serum, etc.) and brand
 - **Skincare Routines**: Group products into AM/PM routines for one-tap logging
 - **Today Dashboard**: Overview of today's stats, recent logs, and low-stock warnings
 - **Haptic Feedback**: Tactile responses on key interactions
 - **Data Persistence**: AsyncStorage for all data
+- **PWA**: manifest.json at `/manifest.json`, custom SVG icon at `/icons/icon.svg`, `app/+html.tsx` with PWA meta tags; theme color #34C78B; standalone display mode
 
 ### Architecture
 - **Routing**: Expo Router (file-based, tabs)
