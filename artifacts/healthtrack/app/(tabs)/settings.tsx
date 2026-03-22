@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -132,7 +133,8 @@ function StatusBanner({ state, message }: { state: ActionState; message: string 
 export default function SettingsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs } = useApp();
+  const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs, userProfile, setUserProfile } = useApp();
+  const otherDrugsRef = useRef<TextInput>(null);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
@@ -332,6 +334,77 @@ export default function SettingsScreen() {
           )}
         </>
       )}
+
+      <SectionHeader title="LIFESTYLE & INTERACTIONS" />
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.rowItem, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderLight }]}>
+          <View style={[styles.rowIcon, { backgroundColor: "#FF9F0A20" }]}>
+            <Ionicons name="wine-outline" size={18} color="#FF9F0A" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Drinks Alcohol</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+              Include alcohol when checking for drug interactions
+            </Text>
+          </View>
+          <Switch
+            value={userProfile.drinksAlcohol}
+            onValueChange={v => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setUserProfile({ drinksAlcohol: v });
+            }}
+            trackColor={{ false: colors.border, true: "#FF9F0A" }}
+            thumbColor="#fff"
+            ios_backgroundColor={colors.border}
+          />
+        </View>
+        <View style={[styles.rowItem, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderLight }]}>
+          <View style={[styles.rowIcon, { backgroundColor: "#8E8E9320" }]}>
+            <Ionicons name="flame-outline" size={18} color="#8E8E93" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Uses Tobacco / Nicotine</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+              Include tobacco and nicotine in interaction checks
+            </Text>
+          </View>
+          <Switch
+            value={userProfile.smokesTobacco}
+            onValueChange={v => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setUserProfile({ smokesTobacco: v });
+            }}
+            trackColor={{ false: colors.border, true: colors.tint }}
+            thumbColor="#fff"
+            ios_backgroundColor={colors.border}
+          />
+        </View>
+        <View style={[styles.rowItem]}>
+          <View style={[styles.rowIcon, { backgroundColor: `${colors.accent}20` }]}>
+            <Ionicons name="ellipsis-horizontal-circle-outline" size={18} color={colors.accent} />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Other Substances</Text>
+            <TextInput
+              ref={otherDrugsRef}
+              style={[styles.otherDrugsInput, { color: colors.text, borderColor: colors.border }]}
+              placeholder="e.g. cannabis, caffeine, supplements…"
+              placeholderTextColor={colors.textTertiary}
+              value={userProfile.otherDrugs}
+              onChangeText={t => setUserProfile({ otherDrugs: t })}
+              returnKeyType="done"
+              multiline={false}
+            />
+          </View>
+        </View>
+      </View>
+      <View style={[styles.hkInfoCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 4 }]}>
+        <Ionicons name="information-circle-outline" size={15} color={colors.textSecondary} />
+        <Text style={[styles.hkInfoText, { color: colors.textSecondary }]}>
+          These flags are used only to check drug interactions on the Medications screen. Your data never leaves this device. Interaction data is sourced from the free{" "}
+          <Text style={{ fontFamily: "Inter_600SemiBold" }}>NIH RxNorm API</Text>.
+        </Text>
+      </View>
 
       <SectionHeader title="YOUR DATA" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -568,5 +641,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     marginTop: 20,
     marginBottom: 8,
+  },
+  otherDrugsInput: {
+    marginTop: 6,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    height: 40,
   },
 });
