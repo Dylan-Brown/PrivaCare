@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   Alert,
   Platform,
@@ -19,6 +19,8 @@ import { MedicationGroupCard } from "@/components/medications/MedicationGroupCar
 import { AddMedicationModal } from "@/components/medications/AddMedicationModal";
 import { AddGroupModal } from "@/components/medications/AddGroupModal";
 import { UpdateCountModal } from "@/components/medications/UpdateCountModal";
+import { InteractionsBanner } from "@/components/medications/InteractionsBanner";
+import { checkAllInteractions, DrugInteraction } from "@/utils/drugInteractions";
 
 const COLOR_ORDER = [
   "#34C78B", "#FF6B6B", "#007AFF", "#FF9F0A",
@@ -45,6 +47,7 @@ export default function MedicationsScreen() {
     unarchiveMedication,
     setAwaitingRefill,
     reorderMedications,
+    userProfile,
   } = useApp();
 
   const [activeTab, setActiveTab]         = useState<TabType>("medications");
@@ -55,6 +58,43 @@ export default function MedicationsScreen() {
   const [updateCountMed, setUpdateCountMed] = useState<Medication | null>(null);
   const [archiveExpanded, setArchiveExpanded] = useState(false);
   const [reorderMode, setReorderMode]     = useState(false);
+
+  const [interactionsLoading, setInteractionsLoading] = useState(false);
+  const [interactions, setInteractions]   = useState<DrugInteraction[]>([]);
+  const [interactionWarnings, setInteractionWarnings] = useState<string[]>([]);
+  const [interactionsCheckedAt, setInteractionsCheckedAt] = useState<string | null>(null);
+  const interactionDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runInteractionCheck = useCallback(async () => {
+    const activeMedNames = medications
+      .filter(m => m.status === "active")
+      .map(m => m.name);
+    if (activeMedNames.length === 0) {
+      setInteractions([]);
+      setInteractionWarnings([]);
+      setInteractionsCheckedAt(null);
+      return;
+    }
+    setInteractionsLoading(true);
+    try {
+      const result = await checkAllInteractions(activeMedNames, userProfile);
+      setInteractions(result.interactions);
+      setInteractionWarnings(result.warnings);
+      setInteractionsCheckedAt(result.checkedAt);
+    } finally {
+      setInteractionsLoading(false);
+    }
+  }, [medications, userProfile]);
+
+  useEffect(() => {
+    if (interactionDebounce.current) clearTimeout(interactionDebounce.current);
+    interactionDebounce.current = setTimeout(() => {
+      runInteractionCheck();
+    }, 800);
+    return () => {
+      if (interactionDebounce.current) clearTimeout(interactionDebounce.current);
+    };
+  }, [runInteractionCheck]);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
@@ -227,6 +267,16 @@ export default function MedicationsScreen() {
             </Pressable>
           ))}
         </View>
+
+        {activeTab === "medications" && medications.filter(m => m.status === "active").length > 0 && (
+          <InteractionsBanner
+            interactions={interactions}
+            loading={interactionsLoading}
+            warnings={interactionWarnings}
+            lastChecked={interactionsCheckedAt}
+            onRecheck={runInteractionCheck}
+          />
+        )}
 
         {activeTab === "medications" ? (
           <>

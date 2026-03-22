@@ -7,9 +7,12 @@ import React, {
   useState,
 } from "react";
 import { logMedicationDoseToHealthKit } from "@/utils/healthKit";
+import { UserProfile } from "@/utils/drugInteractions";
 
 export type MedicationStatus = "active" | "storage" | "history";
 export type MedicationCategory = "prescription" | "generic" | "supplement";
+
+export type { UserProfile };
 
 export type CompoundIngredient = {
   name: string;
@@ -122,6 +125,9 @@ type AppContextType = {
   getTodayMedLogs: () => MedicationLog[];
   getTodaySkincareLogs: () => SkincareLog[];
   getMedicationsNeedingRefill: () => Medication[];
+
+  userProfile: UserProfile;
+  setUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 };
 
 function generateId(): string {
@@ -153,6 +159,12 @@ function migrateMedication(m: any, index: number): Medication {
   };
 }
 
+const DEFAULT_USER_PROFILE: UserProfile = {
+  drinksAlcohol: false,
+  smokesTobacco: false,
+  otherDrugs: "",
+};
+
 const STORAGE_KEYS = {
   MEDICATIONS: "@healthtrack_medications",
   MED_GROUPS: "@healthtrack_med_groups",
@@ -160,6 +172,7 @@ const STORAGE_KEYS = {
   SKINCARE_PRODUCTS: "@healthtrack_skincare_products",
   SKINCARE_ROUTINES: "@healthtrack_skincare_routines",
   SKINCARE_LOGS: "@healthtrack_skincare_logs",
+  USER_PROFILE: "@vital_user_profile",
 };
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -172,17 +185,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [skincareRoutines, setSkincareRoutines] = useState<SkincareRoutine[]>([]);
   const [skincareLogs, setSkincareLogs] = useState<SkincareLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userProfile, setUserProfileState] = useState<UserProfile>(DEFAULT_USER_PROFILE);
 
   useEffect(() => {
     (async () => {
       try {
-        const [meds, groups, medLogs, products, routines, skinLogs] = await Promise.all([
+        const [meds, groups, medLogs, products, routines, skinLogs, profileRaw] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.MEDICATIONS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_GROUPS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_LOGS),
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_PRODUCTS),
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_ROUTINES),
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_LOGS),
+          AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE),
         ]);
         if (meds) setMedications((JSON.parse(meds) as any[]).map((m, i) => migrateMedication(m, i)));
         if (groups) setMedicationGroups(JSON.parse(groups));
@@ -190,12 +205,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (products) setSkincareProducts(JSON.parse(products));
         if (routines) setSkincareRoutines(JSON.parse(routines));
         if (skinLogs) setSkincareLogs(JSON.parse(skinLogs));
+        if (profileRaw) setUserProfileState({ ...DEFAULT_USER_PROFILE, ...JSON.parse(profileRaw) });
       } catch (e) {
         console.error("Error loading data", e);
       } finally {
         setIsLoading(false);
       }
     })();
+  }, []);
+
+  const setUserProfile = useCallback(async (updates: Partial<UserProfile>) => {
+    setUserProfileState(prev => {
+      const next = { ...prev, ...updates };
+      AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const addMedication = useCallback(async (med: Omit<Medication, "id">) => {
@@ -553,6 +577,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     getTodayMedLogs,
     getTodaySkincareLogs,
     getMedicationsNeedingRefill,
+    userProfile,
+    setUserProfile,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
