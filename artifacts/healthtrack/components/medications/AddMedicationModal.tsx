@@ -18,8 +18,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CompoundIngredient, Medication, MedicationCategory, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { IconColorSheet, SHARED_COLORS } from "@/components/ui/IconColorSheet";
 
-const COLORS = ["#34C78B", "#FF6B6B", "#007AFF", "#FF9F0A", "#AF52DE", "#FF6CBF", "#5AC8FA", "#4CD964"];
+const COLORS = SHARED_COLORS;
 const UNITS  = ["mg", "ml", "tablet", "capsule", "drops", "IU", "mcg", "g"];
 
 const CATEGORIES: { key: MedicationCategory; label: string; icon: string }[] = [
@@ -53,6 +55,8 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
   const [lowThreshold, setLowThreshold] = useState("10");
   const [notifyLow, setNotifyLow]     = useState(true);
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+  const [selectedIcon, setSelectedIcon] = useState("mci:pill");
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [category, setCategory]       = useState<MedicationCategory | undefined>(undefined);
   const [isCompound, setIsCompound]   = useState(false);
   const [ingredients, setIngredients] = useState<CompoundIngredient[]>(DEFAULT_INGREDIENTS);
@@ -69,6 +73,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         setLowThreshold(editMed.lowStockThreshold.toString());
         setNotifyLow(editMed.notifyLowStock);
         setSelectedColor(editMed.color);
+        setSelectedIcon(editMed.icon ?? "mci:pill");
         setCategory(editMed.category);
         setIsCompound(editMed.isCompound ?? false);
         setIngredients(
@@ -80,7 +85,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         setName(""); setBrandName(""); setDosage(""); setUnit("mg");
         setBottleCount("30"); setRemaining("30");
         setLowThreshold("10"); setNotifyLow(true);
-        setSelectedColor(COLORS[0]); setCategory(undefined);
+        setSelectedColor(COLORS[0]); setSelectedIcon("mci:pill"); setCategory(undefined);
         setIsCompound(false); setIngredients(DEFAULT_INGREDIENTS);
       }
     }
@@ -150,6 +155,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         lowStockThreshold: threshold,
         notifyLowStock: notifyLow,
         color: selectedColor,
+        icon: selectedIcon,
         category,
         isCompound,
         ingredients: cleanIngredients,
@@ -166,6 +172,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         lowStockThreshold: threshold,
         notifyLowStock: notifyLow,
         color: selectedColor,
+        icon: selectedIcon,
         status: "active",
         awaitingRefill: false,
         category,
@@ -460,27 +467,38 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
             )}
           </View>
 
-          {/* Color */}
+          {/* Appearance */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>COLOR</Text>
-            <View style={styles.colorRow}>
-              {COLORS.map(c => (
-                <Pressable
-                  key={c}
-                  onPress={() => setSelectedColor(c)}
-                  style={[
-                    styles.colorDot,
-                    { backgroundColor: c },
-                    selectedColor === c && styles.colorDotSelected,
-                  ]}
-                >
-                  {selectedColor === c && <Ionicons name="checkmark" size={14} color="#fff" />}
-                </Pressable>
-              ))}
-            </View>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>APPEARANCE</Text>
+            <Pressable
+              style={[styles.appearanceBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => setShowIconPicker(true)}
+            >
+              <View style={[styles.appearancePreview, { backgroundColor: `${selectedColor}22` }]}>
+                <AppIcon icon={selectedIcon} size={28} color={selectedColor} />
+              </View>
+              <View style={styles.appearanceInfo}>
+                <Text style={[styles.appearanceLabel, { color: colors.text }]}>Icon & Color</Text>
+                <Text style={[styles.appearanceHint, { color: colors.textSecondary }]}>
+                  Tap to choose icon shape and color
+                </Text>
+              </View>
+              <View style={[styles.colorSwatch, { backgroundColor: selectedColor }]} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <IconColorSheet
+        visible={showIconPicker}
+        onClose={() => setShowIconPicker(false)}
+        selectedIcon={selectedIcon}
+        selectedColor={selectedColor}
+        onIconChange={setSelectedIcon}
+        onColorChange={setSelectedColor}
+        type="medication"
+      />
     </Modal>
   );
 }
@@ -555,14 +573,22 @@ const styles = StyleSheet.create({
   switchLabel: { fontSize: 16, fontFamily: "Inter_500Medium" },
   switchSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
 
-  colorRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  colorDot: {
-    width: 32, height: 32, borderRadius: 16,
-    alignItems: "center", justifyContent: "center",
+  appearanceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
   },
-  colorDotSelected: {
-    transform: [{ scale: 1.15 }],
-    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 }, elevation: 4,
+  appearancePreview: {
+    width: 52, height: 52, borderRadius: 26,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  appearanceInfo: { flex: 1 },
+  appearanceLabel: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  appearanceHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  colorSwatch: {
+    width: 22, height: 22, borderRadius: 11,
   },
 });

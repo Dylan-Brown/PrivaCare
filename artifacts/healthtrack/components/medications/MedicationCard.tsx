@@ -18,6 +18,7 @@ import Animated, {
 import { Medication, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 import { CountBadge } from "@/components/ui/CountBadge";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
   prescription: { label: "Rx",  color: "#007AFF" },
@@ -36,6 +37,7 @@ type Props = {
   onMoveDown?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  onEditAppearance?: () => void;
 };
 
 export function MedicationCard({
@@ -49,6 +51,7 @@ export function MedicationCard({
   onMoveDown,
   isFirst = false,
   isLast = false,
+  onEditAppearance,
 }: Props) {
   const { colors } = useTheme();
   const { logMedication, archiveMedication, setAwaitingRefill } = useApp();
@@ -135,6 +138,9 @@ export function MedicationCard({
           <View style={[styles.colorBar, { backgroundColor: accentColor }]} />
           <View style={[styles.content, styles.reorderContent]}>
             <Ionicons name="reorder-three-outline" size={22} color={colors.textTertiary} />
+            <View style={[styles.reorderIconCircle, { backgroundColor: `${accentColor}18` }]}>
+              <AppIcon icon={medication.icon ?? "mci:pill"} size={18} color={accentColor} />
+            </View>
             <View style={styles.reorderInfo}>
               <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
                 {medication.name}
@@ -148,6 +154,17 @@ export function MedicationCard({
             </View>
           </View>
           <View style={styles.reorderBtns}>
+            {onEditAppearance && (
+              <Pressable
+                style={styles.reorderBtn}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onEditAppearance();
+                }}
+              >
+                <Ionicons name="color-palette-outline" size={18} color={accentColor} />
+              </Pressable>
+            )}
             <Pressable
               style={[styles.reorderBtn, isFirst && styles.reorderBtnDisabled]}
               onPress={isFirst ? undefined : onMoveUp}
@@ -195,19 +212,19 @@ export function MedicationCard({
         <View style={styles.content}>
           <View style={styles.top}>
             <View style={[styles.iconCircle, { backgroundColor: `${accentColor}18` }]}>
-              <Ionicons
-                name={
-                  medication.isCompound
-                    ? "layers"
-                    : isArchived
-                    ? medication.status === "storage"
-                      ? "archive"
-                      : "time"
-                    : "medkit"
-                }
-                size={compact ? 16 : 18}
-                color={accentColor}
-              />
+              {isArchived ? (
+                <Ionicons
+                  name={medication.status === "storage" ? "archive" : "time"}
+                  size={compact ? 16 : 18}
+                  color={accentColor}
+                />
+              ) : (
+                <AppIcon
+                  icon={medication.icon ?? (medication.isCompound ? "ion:layers" : "mci:pill")}
+                  size={compact ? 16 : 18}
+                  color={accentColor}
+                />
+              )}
             </View>
             <View style={styles.info}>
               <View style={styles.nameRow}>
@@ -343,6 +360,10 @@ const styles = StyleSheet.create({
   logBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   reorderContent: { flexDirection: "row", alignItems: "center", gap: 10 },
+  reorderIconCircle: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
   reorderInfo: { flex: 1 },
   compoundHint: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginBottom: 1 },
   reorderBtns: { flexDirection: "column", paddingRight: 6, paddingVertical: 4 },

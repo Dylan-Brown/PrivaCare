@@ -39,6 +39,7 @@ export type Medication = {
   isCompound?: boolean;
   ingredients?: CompoundIngredient[];
   sortOrder?: number;
+  icon?: string;
 };
 
 export type MedicationGroup = {
@@ -67,6 +68,8 @@ export type SkincareProduct = {
   brand: string;
   color: string;
   routineId?: string;
+  icon?: string;
+  sortOrder?: number;
 };
 
 export type SkincareRoutine = {
@@ -107,6 +110,7 @@ type AppContextType = {
   unarchiveMedication: (id: string) => Promise<void>;
   setAwaitingRefill: (id: string, value: boolean) => Promise<void>;
   reorderMedications: (orderedIds: string[]) => Promise<void>;
+  reorderSkincareProducts: (orderedIds: string[]) => Promise<void>;
 
   addMedicationGroup: (group: Omit<MedicationGroup, "id">) => Promise<void>;
   updateMedicationGroup: (id: string, updates: Partial<MedicationGroup>) => Promise<void>;
@@ -156,6 +160,15 @@ function migrateMedication(m: any, index: number): Medication {
     isCompound: m.isCompound ?? false,
     ingredients: m.ingredients ?? [],
     sortOrder: m.sortOrder ?? index,
+    icon: m.icon ?? "mci:pill",
+  };
+}
+
+function migrateSkincareProduct(p: any, index: number): SkincareProduct {
+  return {
+    ...p,
+    icon: p.icon ?? "mci:bottle-tonic",
+    sortOrder: p.sortOrder ?? index,
   };
 }
 
@@ -202,7 +215,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (meds) setMedications((JSON.parse(meds) as any[]).map((m, i) => migrateMedication(m, i)));
         if (groups) setMedicationGroups(JSON.parse(groups));
         if (medLogs) setMedicationLogs(JSON.parse(medLogs));
-        if (products) setSkincareProducts(JSON.parse(products));
+        if (products) setSkincareProducts((JSON.parse(products) as any[]).map((p, i) => migrateSkincareProduct(p, i)));
         if (routines) setSkincareRoutines(JSON.parse(routines));
         if (skinLogs) setSkincareLogs(JSON.parse(skinLogs));
         if (profileRaw) setUserProfileState({ ...DEFAULT_USER_PROFILE, ...JSON.parse(profileRaw) });
@@ -400,6 +413,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const reorderSkincareProducts = useCallback(async (orderedIds: string[]) => {
+    setSkincareProducts(prev => {
+      const map = new Map(prev.map(p => [p.id, p]));
+      const reordered = orderedIds
+        .map((id, idx) => {
+          const p = map.get(id);
+          return p ? { ...p, sortOrder: idx } : null;
+        })
+        .filter(Boolean) as SkincareProduct[];
+      const rest = prev.filter(p => !orderedIds.includes(p.id));
+      const updated = [...reordered, ...rest];
+      AsyncStorage.setItem(STORAGE_KEYS.SKINCARE_PRODUCTS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   const addMedicationGroup = useCallback(async (group: Omit<MedicationGroup, "id">) => {
     const newGroup: MedicationGroup = { ...group, id: generateId() };
     setMedicationGroups(prev => {
@@ -563,6 +592,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     unarchiveMedication,
     setAwaitingRefill,
     reorderMedications,
+    reorderSkincareProducts,
     addMedicationGroup,
     updateMedicationGroup,
     deleteMedicationGroup,

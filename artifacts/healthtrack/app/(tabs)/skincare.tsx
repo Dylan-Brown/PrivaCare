@@ -18,6 +18,7 @@ import { SkincareProductCard } from "@/components/skincare/SkincareProductCard";
 import { SkincareRoutineCard } from "@/components/skincare/SkincareRoutineCard";
 import { AddSkincareProductModal } from "@/components/skincare/AddSkincareProductModal";
 import { AddRoutineModal } from "@/components/skincare/AddRoutineModal";
+import { IconColorSheet } from "@/components/ui/IconColorSheet";
 
 type TabType = "products" | "routines";
 
@@ -29,6 +30,8 @@ export default function SkincareScreen() {
     skincareRoutines,
     deleteSkincareProduct,
     deleteSkincareRoutine,
+    reorderSkincareProducts,
+    updateSkincareProduct,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<TabType>("products");
@@ -36,8 +39,28 @@ export default function SkincareScreen() {
   const [showAddRoutine, setShowAddRoutine] = useState(false);
   const [editProduct, setEditProduct] = useState<SkincareProduct | null>(null);
   const [editRoutine, setEditRoutine] = useState<SkincareRoutine | null>(null);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [editAppearanceProduct, setEditAppearanceProduct] = useState<SkincareProduct | null>(null);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+
+  const sortedProducts = [...skincareProducts].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+  const moveUp = (idx: number) => {
+    if (idx === 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newOrder = [...sortedProducts];
+    [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+    reorderSkincareProducts(newOrder.map(p => p.id));
+  };
+
+  const moveDown = (idx: number) => {
+    if (idx === sortedProducts.length - 1) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newOrder = [...sortedProducts];
+    [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+    reorderSkincareProducts(newOrder.map(p => p.id));
+  };
 
   const handleDeleteProduct = (product: SkincareProduct) => {
     Alert.alert("Delete Product", `Remove ${product.name}?`, [
@@ -65,18 +88,46 @@ export default function SkincareScreen() {
       >
         <View style={styles.headerSection}>
           <Text style={[styles.title, { color: colors.text }]}>Skincare</Text>
-          <Pressable
-            style={[styles.addBtn, { backgroundColor: colors.accent }]}
-            onPress={() => activeTab === "products" ? setShowAddProduct(true) : setShowAddRoutine(true)}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-          </Pressable>
+          <View style={styles.headerActions}>
+            {activeTab === "products" && skincareProducts.length > 0 && (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setReorderMode(v => !v);
+                }}
+                style={[
+                  styles.reorderToggle,
+                  {
+                    backgroundColor: reorderMode ? colors.accent : colors.borderLight,
+                    borderColor: reorderMode ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={reorderMode ? "checkmark" : "swap-vertical-outline"}
+                  size={14}
+                  color={reorderMode ? "#fff" : colors.textSecondary}
+                />
+                <Text style={[styles.reorderToggleText, { color: reorderMode ? "#fff" : colors.textSecondary }]}>
+                  {reorderMode ? "Done" : "Reorder"}
+                </Text>
+              </Pressable>
+            )}
+            {!reorderMode && (
+              <Pressable
+                style={[styles.addBtn, { backgroundColor: colors.accent }]}
+                onPress={() => activeTab === "products" ? setShowAddProduct(true) : setShowAddRoutine(true)}
+              >
+                <Ionicons name="add" size={20} color="#fff" />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         <View style={[styles.segmentControl, { backgroundColor: colors.borderLight }]}>
           <Pressable
             style={[styles.segment, activeTab === "products" && [styles.segmentActive, { backgroundColor: colors.card }]]}
-            onPress={() => setActiveTab("products")}
+            onPress={() => { setActiveTab("products"); setReorderMode(false); }}
           >
             <Text style={[styles.segmentText, { color: activeTab === "products" ? colors.text : colors.textSecondary }]}>
               Products
@@ -84,7 +135,7 @@ export default function SkincareScreen() {
           </Pressable>
           <Pressable
             style={[styles.segment, activeTab === "routines" && [styles.segmentActive, { backgroundColor: colors.card }]]}
-            onPress={() => setActiveTab("routines")}
+            onPress={() => { setActiveTab("routines"); setReorderMode(false); }}
           >
             <Text style={[styles.segmentText, { color: activeTab === "routines" ? colors.text : colors.textSecondary }]}>
               Routines
@@ -111,22 +162,38 @@ export default function SkincareScreen() {
               </Pressable>
             </View>
           ) : (
-            <View style={styles.list}>
-              {skincareProducts.map(product => (
-                <SkincareProductCard
-                  key={product.id}
-                  product={product}
-                  onLongPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    Alert.alert(product.name, "What would you like to do?", [
-                      { text: "Edit", onPress: () => { setEditProduct(product); setShowAddProduct(true); } },
-                      { text: "Delete", style: "destructive", onPress: () => handleDeleteProduct(product) },
-                      { text: "Cancel", style: "cancel" },
-                    ]);
-                  }}
-                />
-              ))}
-            </View>
+            <>
+              {reorderMode && (
+                <View style={[styles.reorderHint, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}30` }]}>
+                  <Ionicons name="information-circle-outline" size={15} color={colors.accent} />
+                  <Text style={[styles.reorderHintText, { color: colors.accent }]}>
+                    Use arrows to reorder. Tap the palette icon to edit appearance. Tap Done when finished.
+                  </Text>
+                </View>
+              )}
+              <View style={styles.list}>
+                {sortedProducts.map((product, idx) => (
+                  <SkincareProductCard
+                    key={product.id}
+                    product={product}
+                    reorderMode={reorderMode}
+                    onMoveUp={() => moveUp(idx)}
+                    onMoveDown={() => moveDown(idx)}
+                    isFirst={idx === 0}
+                    isLast={idx === sortedProducts.length - 1}
+                    onEditAppearance={() => setEditAppearanceProduct(product)}
+                    onLongPress={reorderMode ? undefined : () => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      Alert.alert(product.name, "What would you like to do?", [
+                        { text: "Edit", onPress: () => { setEditProduct(product); setShowAddProduct(true); } },
+                        { text: "Delete", style: "destructive", onPress: () => handleDeleteProduct(product) },
+                        { text: "Cancel", style: "cancel" },
+                      ]);
+                    }}
+                  />
+                ))}
+              </View>
+            </>
           )
         ) : (
           skincareRoutines.length === 0 ? (
@@ -178,6 +245,25 @@ export default function SkincareScreen() {
         onClose={() => { setShowAddRoutine(false); setEditRoutine(null); }}
         editRoutine={editRoutine}
       />
+      <IconColorSheet
+        visible={!!editAppearanceProduct}
+        onClose={() => setEditAppearanceProduct(null)}
+        selectedIcon={editAppearanceProduct?.icon ?? "mci:bottle-tonic"}
+        selectedColor={editAppearanceProduct?.color ?? "#34C78B"}
+        onIconChange={async (icon) => {
+          if (editAppearanceProduct) {
+            await updateSkincareProduct(editAppearanceProduct.id, { icon });
+            setEditAppearanceProduct(prev => prev ? { ...prev, icon } : null);
+          }
+        }}
+        onColorChange={async (color) => {
+          if (editAppearanceProduct) {
+            await updateSkincareProduct(editAppearanceProduct.id, { color });
+            setEditAppearanceProduct(prev => prev ? { ...prev, color } : null);
+          }
+        }}
+        type="skincare"
+      />
     </View>
   );
 }
@@ -189,9 +275,20 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8,
   },
   title: { fontSize: 32, fontFamily: "Inter_700Bold" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  reorderToggle: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
+  },
+  reorderToggleText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   addBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
   },
+  reorderHint: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1,
+  },
+  reorderHintText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 18 },
   segmentControl: {
     flexDirection: "row", borderRadius: 12, padding: 3, marginBottom: 4,
   },
