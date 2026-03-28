@@ -8,11 +8,17 @@ import React, {
 } from "react";
 import { logMedicationDoseToHealthKit } from "@/utils/healthKit";
 import { UserProfile } from "@/utils/drugInteractions";
+import {
+  ItemSchedule,
+  shouldAppearOnDate,
+  todayString,
+  toDateString,
+} from "@/utils/scheduleCompute";
+
+export type { UserProfile, ItemSchedule };
 
 export type MedicationStatus = "active" | "storage" | "history";
 export type MedicationCategory = "prescription" | "generic" | "supplement";
-
-export type { UserProfile };
 
 export type CompoundIngredient = {
   name: string;
@@ -27,6 +33,7 @@ export type Medication = {
   dosage: string;
   unit: string;
   color: string;
+  icon?: string;
   bottleCount: number;
   totalCount: number;
   remainingCount: number;
@@ -39,7 +46,8 @@ export type Medication = {
   isCompound?: boolean;
   ingredients?: CompoundIngredient[];
   sortOrder?: number;
-  icon?: string;
+  schedule: ItemSchedule;
+  notes?: string;
 };
 
 export type MedicationGroup = {
@@ -67,9 +75,11 @@ export type SkincareProduct = {
   type: string;
   brand: string;
   color: string;
-  routineId?: string;
   icon?: string;
+  routineId?: string;
   sortOrder?: number;
+  schedule: ItemSchedule;
+  expiryDate?: string;
 };
 
 export type SkincareRoutine = {
@@ -88,6 +98,40 @@ export type SkincareLog = {
   loggedAt: string;
   routineId?: string;
   routineName?: string;
+};
+
+export type DayLogEntry = {
+  id: string;
+  itemId: string;
+  itemType: "medication" | "skincare";
+  itemName: string;
+  scheduledTime: string;   // "HH:MM" 24-hr
+  completedAt?: string;
+  isComplete: boolean;
+};
+
+export type SkincareReactionNote = {
+  id: string;
+  productId: string;
+  productName: string;
+  note: string;
+  sentiment: "positive" | "negative" | "neutral";
+  loggedAt: string;
+};
+
+export type DayLog = {
+  date: string;                        // "YYYY-MM-DD"
+  entries: DayLogEntry[];
+  reactionNotes: SkincareReactionNote[];
+};
+
+export type AppNotification = {
+  id: string;
+  message: string;
+  detail?: string;
+  type: "insight" | "general";
+  createdAt: string;
+  read: boolean;
 };
 
 type AppContextType = {
@@ -130,6 +174,22 @@ type AppContextType = {
   getTodaySkincareLogs: () => SkincareLog[];
   getMedicationsNeedingRefill: () => Medication[];
 
+  // Day logs (schedule-based timeline)
+  dayLogs: Record<string, DayLog>;
+  buildDayLog: (date: string) => void;
+  getDayLog: (date: string) => DayLog;
+  completeDayEntry: (date: string, entryId: string) => Promise<void>;
+  uncompleteDayEntry: (date: string, entryId: string) => Promise<void>;
+  completeAllInGroup: (date: string, itemType: string, scheduledTime: string) => Promise<void>;
+  logSkincareReaction: (date: string, reaction: Omit<SkincareReactionNote, "id">) => Promise<void>;
+
+  // Notifications
+  notifications: AppNotification[];
+  addNotification: (notif: Omit<AppNotification, "id">) => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+
   userProfile: UserProfile;
   setUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 };
@@ -161,6 +221,8 @@ function migrateMedication(m: any, index: number): Medication {
     ingredients: m.ingredients ?? [],
     sortOrder: m.sortOrder ?? index,
     icon: m.icon ?? "mci:pill",
+    schedule: m.schedule ?? { asNeeded: true },
+    notes: m.notes ?? undefined,
   };
 }
 
@@ -169,6 +231,8 @@ function migrateSkincareProduct(p: any, index: number): SkincareProduct {
     ...p,
     icon: p.icon ?? "mci:bottle-tonic",
     sortOrder: p.sortOrder ?? index,
+    schedule: p.schedule ?? { asNeeded: true },
+    expiryDate: p.expiryDate ?? undefined,
   };
 }
 
@@ -186,6 +250,10 @@ const STORAGE_KEYS = {
   SKINCARE_ROUTINES: "@healthtrack_skincare_routines",
   SKINCARE_LOGS: "@healthtrack_skincare_logs",
   USER_PROFILE: "@vital_user_profile",
+  DAY_LOGS: "@vital_day_logs",
+  NOTIFICATIONS: "@vital_notifications",
+  INSIGHTS_WEEKLY: "@vital_insights_last_weekly",
+  INSIGHTS_MONTHLY: "@vital_insights_last_monthly",
 };
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -199,11 +267,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [skincareLogs, setSkincareLogs] = useState<SkincareLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfileState] = useState<UserProfile>(DEFAULT_USER_PROFILE);
+  const [dayLogs, setDayLogs] = useState<Record<string, DayLog>>({});
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  // ─── Load all data ────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
-        const [meds, groups, medLogs, products, routines, skinLogs, profileRaw] = await Promise.all([
+        const [meds, groups, medLogs, products, routines, skinLogs,
+               profileRaw, dayLogsRaw, notifsRaw] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.MEDICATIONS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_GROUPS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_LOGS),
@@ -211,6 +283,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_ROUTINES),
           AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_LOGS),
           AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE),
+          AsyncStorage.getItem(STORAGE_KEYS.DAY_LOGS),
+          AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
         ]);
         if (meds) setMedications((JSON.parse(meds) as any[]).map((m, i) => migrateMedication(m, i)));
         if (groups) setMedicationGroups(JSON.parse(groups));
@@ -219,6 +293,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (routines) setSkincareRoutines(JSON.parse(routines));
         if (skinLogs) setSkincareLogs(JSON.parse(skinLogs));
         if (profileRaw) setUserProfileState({ ...DEFAULT_USER_PROFILE, ...JSON.parse(profileRaw) });
+        if (dayLogsRaw) setDayLogs(JSON.parse(dayLogsRaw));
+        if (notifsRaw) setNotifications(JSON.parse(notifsRaw));
       } catch (e) {
         console.error("Error loading data", e);
       } finally {
@@ -227,6 +303,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  // ─── Build today's log once data is ready ─────────────────────────────────
+  useEffect(() => {
+    if (!isLoading) {
+      buildDayLog(todayString());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
+  // ─── User profile ─────────────────────────────────────────────────────────
   const setUserProfile = useCallback(async (updates: Partial<UserProfile>) => {
     setUserProfileState(prev => {
       const next = { ...prev, ...updates };
@@ -235,6 +320,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ─── Medications ──────────────────────────────────────────────────────────
   const addMedication = useCallback(async (med: Omit<Medication, "id">) => {
     const newMed: Medication = { ...med, id: generateId() };
     setMedications(prev => {
@@ -334,13 +420,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedications(prev => {
       const updated = prev.map(m =>
         m.id === medicationId
-          ? {
-              ...m,
-              remainingCount: m.remainingCount + amount,
-              bottleCount: amount,
-              totalCount: amount,
-              awaitingRefill: false,
-            }
+          ? { ...m, remainingCount: m.remainingCount + amount, bottleCount: amount, totalCount: amount, awaitingRefill: false }
           : m
       );
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
@@ -364,12 +444,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedications(prev => {
       const updated = prev.map(m =>
         m.id === id
-          ? {
-              ...m,
-              status: mode as MedicationStatus,
-              remainingCount: mode === "history" ? 0 : m.remainingCount,
-              awaitingRefill: false,
-            }
+          ? { ...m, status: mode as MedicationStatus, remainingCount: mode === "history" ? 0 : m.remainingCount, awaitingRefill: false }
           : m
       );
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
@@ -379,9 +454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const unarchiveMedication = useCallback(async (id: string) => {
     setMedications(prev => {
-      const updated = prev.map(m =>
-        m.id === id ? { ...m, status: "active" as MedicationStatus } : m
-      );
+      const updated = prev.map(m => m.id === id ? { ...m, status: "active" as MedicationStatus } : m);
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
       return updated;
     });
@@ -389,9 +462,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setAwaitingRefill = useCallback(async (id: string, value: boolean) => {
     setMedications(prev => {
-      const updated = prev.map(m =>
-        m.id === id ? { ...m, awaitingRefill: value } : m
-      );
+      const updated = prev.map(m => m.id === id ? { ...m, awaitingRefill: value } : m);
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(updated));
       return updated;
     });
@@ -401,10 +472,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedications(prev => {
       const map = new Map(prev.map(m => [m.id, m]));
       const reordered = orderedIds
-        .map((id, idx) => {
-          const m = map.get(id);
-          return m ? { ...m, sortOrder: idx } : null;
-        })
+        .map((id, idx) => { const m = map.get(id); return m ? { ...m, sortOrder: idx } : null; })
         .filter(Boolean) as Medication[];
       const rest = prev.filter(m => !orderedIds.includes(m.id));
       const updated = [...reordered, ...rest];
@@ -417,10 +485,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSkincareProducts(prev => {
       const map = new Map(prev.map(p => [p.id, p]));
       const reordered = orderedIds
-        .map((id, idx) => {
-          const p = map.get(id);
-          return p ? { ...p, sortOrder: idx } : null;
-        })
+        .map((id, idx) => { const p = map.get(id); return p ? { ...p, sortOrder: idx } : null; })
         .filter(Boolean) as SkincareProduct[];
       const rest = prev.filter(p => !orderedIds.includes(p.id));
       const updated = [...reordered, ...rest];
@@ -429,6 +494,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ─── Medication groups ────────────────────────────────────────────────────
   const addMedicationGroup = useCallback(async (group: Omit<MedicationGroup, "id">) => {
     const newGroup: MedicationGroup = { ...group, id: generateId() };
     setMedicationGroups(prev => {
@@ -454,6 +520,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ─── Skincare products ────────────────────────────────────────────────────
   const addSkincareProduct = useCallback(async (product: Omit<SkincareProduct, "id">) => {
     const newProduct: SkincareProduct = { ...product, id: generateId() };
     setSkincareProducts(prev => {
@@ -479,11 +546,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const logSkincareProduct = useCallback(async (
-    productId: string,
-    routineId?: string,
-    routineName?: string
-  ) => {
+  const logSkincareProduct = useCallback(async (productId: string, routineId?: string, routineName?: string) => {
     setSkincareProducts(prevProducts => {
       const product = prevProducts.find(p => p.id === productId);
       if (!product) return prevProducts;
@@ -559,6 +622,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ─── Existing log helpers ──────────────────────────────────────────────────
   const getTodayMedLogs = useCallback((): MedicationLog[] => {
     return medicationLogs.filter(l => isToday(l.takenAt));
   }, [medicationLogs]);
@@ -573,6 +637,315 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, [medications]);
 
+  // ─── Day Logs ──────────────────────────────────────────────────────────────
+  const buildDayLog = useCallback((date: string) => {
+    setDayLogs(prevLogs => {
+      const existing: DayLog = prevLogs[date] ?? { date, entries: [], reactionNotes: [] };
+      let entries = [...existing.entries];
+
+      const addEntries = (
+        items: Array<{ id: string; name: string; schedule: ItemSchedule; status?: string }>,
+        type: "medication" | "skincare"
+      ) => {
+        items
+          .filter(item => {
+            if (type === "medication" && (item as any).status !== "active") return false;
+            if (!item.schedule || item.schedule.asNeeded) return false;
+            return shouldAppearOnDate(item.schedule, date);
+          })
+          .forEach(item => {
+            const sched = item.schedule as Extract<ItemSchedule, { asNeeded: false }>;
+            sched.times.forEach(time => {
+              const exists = entries.some(
+                e => e.itemId === item.id && e.itemType === type && e.scheduledTime === time
+              );
+              if (!exists) {
+                entries.push({
+                  id: generateId(),
+                  itemId: item.id,
+                  itemType: type,
+                  itemName: item.name,
+                  scheduledTime: time,
+                  isComplete: false,
+                });
+              }
+            });
+          });
+      };
+
+      addEntries(medications as any, "medication");
+      addEntries(skincareProducts as any, "skincare");
+
+      if (entries.length === existing.entries.length) return prevLogs;
+
+      const updated = { ...prevLogs, [date]: { ...existing, entries } };
+      AsyncStorage.setItem(STORAGE_KEYS.DAY_LOGS, JSON.stringify(updated));
+      return updated;
+    });
+  }, [medications, skincareProducts]);
+
+  const getDayLog = useCallback((date: string): DayLog => {
+    return dayLogs[date] ?? { date, entries: [], reactionNotes: [] };
+  }, [dayLogs]);
+
+  const saveDayLogs = (updated: Record<string, DayLog>) => {
+    AsyncStorage.setItem(STORAGE_KEYS.DAY_LOGS, JSON.stringify(updated));
+  };
+
+  const completeDayEntry = useCallback(async (date: string, entryId: string) => {
+    setDayLogs(prev => {
+      const log = prev[date];
+      if (!log) return prev;
+      const entry = log.entries.find(e => e.id === entryId);
+      const entries = log.entries.map(e =>
+        e.id === entryId ? { ...e, isComplete: true, completedAt: new Date().toISOString() } : e
+      );
+      const updated = { ...prev, [date]: { ...log, entries } };
+      saveDayLogs(updated);
+      // Write to HealthKit if medication
+      if (entry?.itemType === "medication") {
+        const med = medications.find(m => m.id === entry.itemId);
+        if (med) {
+          logMedicationDoseToHealthKit(med.name, new Date());
+          // Also decrement pill count
+          setMedications(prevMeds => {
+            const u = prevMeds.map(m =>
+              m.id === med.id ? { ...m, remainingCount: Math.max(0, m.remainingCount - 1) } : m
+            );
+            AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(u));
+            return u;
+          });
+        }
+      }
+      return updated;
+    });
+  }, [medications]);
+
+  const uncompleteDayEntry = useCallback(async (date: string, entryId: string) => {
+    setDayLogs(prev => {
+      const log = prev[date];
+      if (!log) return prev;
+      const entry = log.entries.find(e => e.id === entryId);
+      const entries = log.entries.map(e =>
+        e.id === entryId ? { ...e, isComplete: false, completedAt: undefined } : e
+      );
+      const updated = { ...prev, [date]: { ...log, entries } };
+      saveDayLogs(updated);
+      // Restore pill count if medication
+      if (entry?.isComplete && entry?.itemType === "medication") {
+        const med = medications.find(m => m.id === entry.itemId);
+        if (med) {
+          setMedications(prevMeds => {
+            const u = prevMeds.map(m =>
+              m.id === med.id ? { ...m, remainingCount: m.remainingCount + 1 } : m
+            );
+            AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(u));
+            return u;
+          });
+        }
+      }
+      return updated;
+    });
+  }, [medications]);
+
+  const completeAllInGroup = useCallback(async (date: string, itemType: string, scheduledTime: string) => {
+    const now = new Date().toISOString();
+    setDayLogs(prev => {
+      const log = prev[date];
+      if (!log) return prev;
+      const entries = log.entries.map(e => {
+        if (e.itemType === itemType && e.scheduledTime === scheduledTime && !e.isComplete) {
+          // Side effects
+          if (e.itemType === "medication") {
+            const med = medications.find(m => m.id === e.itemId);
+            if (med) {
+              logMedicationDoseToHealthKit(med.name, new Date());
+              setMedications(prevMeds => {
+                const u = prevMeds.map(m =>
+                  m.id === med.id ? { ...m, remainingCount: Math.max(0, m.remainingCount - 1) } : m
+                );
+                AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(u));
+                return u;
+              });
+            }
+          }
+          return { ...e, isComplete: true, completedAt: now };
+        }
+        return e;
+      });
+      const updated = { ...prev, [date]: { ...log, entries } };
+      saveDayLogs(updated);
+      return updated;
+    });
+  }, [medications]);
+
+  const logSkincareReaction = useCallback(async (
+    date: string,
+    reaction: Omit<SkincareReactionNote, "id">
+  ) => {
+    const newReaction: SkincareReactionNote = { ...reaction, id: generateId() };
+    setDayLogs(prev => {
+      const log: DayLog = prev[date] ?? { date, entries: [], reactionNotes: [] };
+      const updated = {
+        ...prev,
+        [date]: { ...log, reactionNotes: [...log.reactionNotes, newReaction] },
+      };
+      saveDayLogs(updated);
+      return updated;
+    });
+  }, []);
+
+  // ─── Notifications ─────────────────────────────────────────────────────────
+  const addNotification = useCallback(async (notif: Omit<AppNotification, "id">) => {
+    const newNotif: AppNotification = { ...notif, id: generateId() };
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev];
+      AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    setNotifications(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
+      AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const deleteNotification = useCallback(async (id: string) => {
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // ─── Insights ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (isLoading) return;
+    (async () => {
+      const today = new Date();
+      const todayStr = todayString();
+
+      // Weekly insights: run on Sundays
+      if (today.getDay() === 0) {
+        const lastWeekly = await AsyncStorage.getItem(STORAGE_KEYS.INSIGHTS_WEEKLY);
+        if (lastWeekly !== todayStr) {
+          await AsyncStorage.setItem(STORAGE_KEYS.INSIGHTS_WEEKLY, todayStr);
+          runWeeklyInsights(todayStr);
+        }
+      }
+
+      // Monthly insights: run on the 1st
+      if (today.getDate() === 1) {
+        const lastMonthly = await AsyncStorage.getItem(STORAGE_KEYS.INSIGHTS_MONTHLY);
+        if (lastMonthly !== todayStr) {
+          await AsyncStorage.setItem(STORAGE_KEYS.INSIGHTS_MONTHLY, todayStr);
+          runMonthlyInsights(todayStr);
+        }
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
+  const runWeeklyInsights = useCallback((todayStr: string) => {
+    const past7: string[] = [];
+    for (let i = 1; i <= 7; i++) {
+      past7.push(toDateString(new Date(Date.now() - i * 86400000)));
+    }
+    setDayLogs(prevLogs => {
+      // Count missed (isComplete===false) per item per scheduledTime
+      const missedCount: Record<string, { name: string; time: string; count: number }> = {};
+      past7.forEach(dateStr => {
+        const log = prevLogs[dateStr];
+        if (!log) return;
+        const hasAnyComplete = log.entries.some(e => e.isComplete);
+        if (!hasAnyComplete) return; // skip days with no completions (user was away)
+        log.entries
+          .filter(e => !e.isComplete)
+          .forEach(e => {
+            const key = `${e.itemId}-${e.scheduledTime}`;
+            if (!missedCount[key]) {
+              missedCount[key] = { name: e.itemName, time: e.scheduledTime, count: 0 };
+            }
+            missedCount[key].count++;
+          });
+      });
+
+      // Generate insights for items missed 2+ times
+      Object.values(missedCount)
+        .filter(v => v.count >= 2)
+        .forEach(v => {
+          const [h, m] = v.time.split(":").map(Number);
+          const period = h >= 12 ? "PM" : "AM";
+          const hour = h % 12 === 0 ? 12 : h % 12;
+          const timeLabel = `${hour}:${String(m).padStart(2, "0")} ${period}`;
+          addNotification({
+            type: "insight",
+            message: `You've been missing ${v.name} at ${timeLabel} this week.`,
+            detail: `It was missed ${v.count} times in the past 7 days. Try adjusting the scheduled time to one that works better for your routine.`,
+            createdAt: new Date().toISOString(),
+            read: false,
+          });
+        });
+
+      return prevLogs;
+    });
+  }, [addNotification]);
+
+  const runMonthlyInsights = useCallback((todayStr: string) => {
+    const past30: string[] = [];
+    for (let i = 1; i <= 30; i++) {
+      past30.push(toDateString(new Date(Date.now() - i * 86400000)));
+    }
+    setDayLogs(prevLogs => {
+      const missedByItem: Record<string, { name: string; total: number; byDow: number[] }> = {};
+      past30.forEach(dateStr => {
+        const log = prevLogs[dateStr];
+        if (!log) return;
+        const hasAnyComplete = log.entries.some(e => e.isComplete);
+        if (!hasAnyComplete) return;
+        const dow = new Date(dateStr + "T12:00:00").getDay();
+        log.entries
+          .filter(e => !e.isComplete)
+          .forEach(e => {
+            if (!missedByItem[e.itemId]) {
+              missedByItem[e.itemId] = { name: e.itemName, total: 0, byDow: new Array(7).fill(0) };
+            }
+            missedByItem[e.itemId].total++;
+            missedByItem[e.itemId].byDow[dow]++;
+          });
+      });
+
+      const dayNames = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+      Object.values(missedByItem)
+        .filter(v => v.total >= 4)
+        .forEach(v => {
+          const maxDow = v.byDow.indexOf(Math.max(...v.byDow));
+          const dowMsg = v.byDow[maxDow] >= 3 ? ` — especially on ${dayNames[maxDow]}` : "";
+          addNotification({
+            type: "insight",
+            message: `Monthly check-in: ${v.name} was missed ${v.total} times last month${dowMsg}.`,
+            detail: `That's roughly ${Math.round((v.total / 30) * 7)} missed doses per week. Consider adjusting the schedule or setting a reminder.`,
+            createdAt: new Date().toISOString(),
+            read: false,
+          });
+        });
+
+      return prevLogs;
+    });
+  }, [addNotification]);
+
+  // ─── Context value ─────────────────────────────────────────────────────────
   const value: AppContextType = {
     medications,
     medicationGroups,
@@ -607,6 +980,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     getTodayMedLogs,
     getTodaySkincareLogs,
     getMedicationsNeedingRefill,
+    dayLogs,
+    buildDayLog,
+    getDayLog,
+    completeDayEntry,
+    uncompleteDayEntry,
+    completeAllInGroup,
+    logSkincareReaction,
+    notifications,
+    addNotification,
+    markNotificationRead,
+    markAllNotificationsRead,
+    deleteNotification,
     userProfile,
     setUserProfile,
   };

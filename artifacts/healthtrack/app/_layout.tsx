@@ -47,6 +47,8 @@ function RootLayoutNav() {
     <>
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ title: "Notifications", presentation: "modal" }} />
+        <Stack.Screen name="skincare-reactions" options={{ title: "Skincare Reactions", presentation: "modal" }} />
       </Stack>
       <DonationModal
         visible={donationVisible}
