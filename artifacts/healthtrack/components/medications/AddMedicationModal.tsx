@@ -67,7 +67,7 @@ type Props = {
 
 export function AddMedicationModal({ visible, onClose, editMed }: Props) {
   const { colors } = useTheme();
-  const { addMedication, updateMedication, medications, skincareProducts } = useApp();
+  const { addMedication, updateMedication, medications, skincareProducts, userProfile } = useApp();
   const insets = useSafeAreaInsets();
 
   // ── Core fields ────────────────────────────────────────────────────────
@@ -480,7 +480,8 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
             </View>
           </View>
 
-          {/* Compound */}
+          {/* Compound — only shown when the Compound Medications setting is enabled, or when editing an existing compound med */}
+          {(userProfile.compoundMedicationsEnabled || editMed?.isCompound) && (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.switchRow}>
               <View style={styles.switchInfo}>
@@ -554,6 +555,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
               </>
             )}
           </View>
+          )}
 
           {/* Dosage + Unit */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>

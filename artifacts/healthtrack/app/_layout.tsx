@@ -30,6 +30,7 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const [donationVisible, setDonationVisible]   = useState(false);
+  const [donationPromptCount, setDonationPromptCount] = useState(0);
   const [hkOnboardingVisible, setHkOnboardingVisible] = useState(false);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ function RootLayoutNav() {
     // Donation modal logic (independent)
     trackAppOpen().then(result => {
       if (result.shouldShowDonation) {
+        setDonationPromptCount(result.donationPromptCount);
         setDonationVisible(true);
       }
     });
@@ -84,6 +86,7 @@ function RootLayoutNav() {
         visible={donationVisible}
         onDonate={handleDonate}
         onDismiss={handleDismiss}
+        promptCount={donationPromptCount}
       />
     </>
   );

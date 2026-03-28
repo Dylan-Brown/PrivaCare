@@ -17,11 +17,77 @@ type Props = {
   visible: boolean;
   onDismiss: () => void;
   onDonate: () => void;
+  promptCount?: number;
 };
 
-export function DonationModal({ visible, onDismiss, onDonate }: Props) {
+type PromptContent = {
+  icon: "heart" | "heart-half" | "sparkles";
+  title: string;
+  body: React.ReactNode;
+  dismissText: string;
+};
+
+function getPromptContent(promptCount: number, colors: ReturnType<typeof useTheme>["colors"]): PromptContent {
+  if (promptCount === 0) {
+    return {
+      icon: "heart",
+      title: "Support Private Health Tracking",
+      body: (
+        <>
+          Vital is free and keeps all your health data{" "}
+          <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.text }}>
+            100% on your device
+          </Text>
+          {" "}— no subscriptions, no accounts, no servers.
+          {"\n\n"}
+          If this app helps you stay on top of your health, consider a small donation to keep
+          it ad-free and independent.
+        </>
+      ),
+      dismissText: "Maybe later",
+    };
+  }
+
+  if (promptCount === 1) {
+    return {
+      icon: "heart-half",
+      title: "You're Still Here — Thank You",
+      body: (
+        <>
+          It means a lot that you keep coming back to Vital. Your health data
+          stays{" "}
+          <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.text }}>
+            completely private
+          </Text>
+          {" "}— always on your device, never shared.
+          {"\n\n"}
+          If Vital has been useful, a small donation goes a long way for an
+          independent developer.
+        </>
+      ),
+      dismissText: "Not right now",
+    };
+  }
+
+  return {
+    icon: "sparkles",
+    title: "A Quick Reminder",
+    body: (
+      <>
+        Vital remains free, ad-free, and fully private thanks to donations from
+        people like you.
+        {"\n\n"}
+        If you find it useful, even a small contribution helps keep it going.
+      </>
+    ),
+    dismissText: "Dismiss",
+  };
+}
+
+export function DonationModal({ visible, onDismiss, onDonate, promptCount = 0 }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const content = getPromptContent(promptCount, colors);
 
   const handleDonate = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -54,22 +120,15 @@ export function DonationModal({ visible, onDismiss, onDonate }: Props) {
           <View style={styles.handle} />
 
           <View style={[styles.iconWrap, { backgroundColor: colors.tintLight }]}>
-            <Ionicons name="heart" size={32} color={colors.tint} />
+            <Ionicons name={content.icon} size={32} color={colors.tint} />
           </View>
 
           <Text style={[styles.title, { color: colors.text }]}>
-            Support Private Health Tracking
+            {content.title}
           </Text>
 
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Vital is free and keeps all your health data{" "}
-            <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.text }}>
-              100% on your device
-            </Text>
-            {" "}— no subscriptions, no accounts, no servers.
-            {"\n\n"}
-            If this app helps you stay on top of your health, consider a small donation to keep
-            it ad-free and independent.
+            {content.body}
           </Text>
 
           <View style={[styles.perksRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
@@ -95,7 +154,7 @@ export function DonationModal({ visible, onDismiss, onDonate }: Props) {
 
           <Pressable style={styles.dismissBtn} onPress={handleDismiss}>
             <Text style={[styles.dismissText, { color: colors.textTertiary }]}>
-              Maybe later
+              {content.dismissText}
             </Text>
           </Pressable>
         </Pressable>

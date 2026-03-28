@@ -102,6 +102,7 @@ export type UserProfile = {
   drinksAlcohol: boolean;
   smokesTobacco: boolean;
   otherDrugs: string;
+  compoundMedicationsEnabled?: boolean;
 };
 
 export async function checkAllInteractions(
