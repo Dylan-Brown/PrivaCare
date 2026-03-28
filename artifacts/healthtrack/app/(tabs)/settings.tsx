@@ -335,6 +335,31 @@ export default function SettingsScreen() {
         </>
       )}
 
+      <SectionHeader title="MEDICATIONS" />
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.rowItem, styles.rowItemLast]}>
+          <View style={[styles.rowIcon, { backgroundColor: `${colors.tint}20` }]}>
+            <Ionicons name="layers-outline" size={18} color={colors.tint} />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Compound Medications</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+              Allow adding compound medications (multiple active ingredients)
+            </Text>
+          </View>
+          <Switch
+            value={userProfile.compoundMedicationsEnabled ?? false}
+            onValueChange={v => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setUserProfile({ compoundMedicationsEnabled: v });
+            }}
+            trackColor={{ false: colors.border, true: colors.tint }}
+            thumbColor="#fff"
+            ios_backgroundColor={colors.border}
+          />
+        </View>
+      </View>
+
       <SectionHeader title="LIFESTYLE & INTERACTIONS" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={[styles.rowItem, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderLight }]}>

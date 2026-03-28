@@ -154,17 +154,6 @@ export function MedicationCard({
             </View>
           </View>
           <View style={styles.reorderBtns}>
-            {onEditAppearance && (
-              <Pressable
-                style={styles.reorderBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  onEditAppearance();
-                }}
-              >
-                <Ionicons name="color-palette-outline" size={18} color={accentColor} />
-              </Pressable>
-            )}
             <Pressable
               style={[styles.reorderBtn, isFirst && styles.reorderBtnDisabled]}
               onPress={isFirst ? undefined : onMoveUp}
@@ -211,7 +200,15 @@ export function MedicationCard({
         <View style={[styles.colorBar, { backgroundColor: accentColor }]} />
         <View style={styles.content}>
           <View style={styles.top}>
-            <View style={[styles.iconCircle, { backgroundColor: `${accentColor}18` }]}>
+            <Pressable
+              style={[styles.iconCircle, { backgroundColor: `${accentColor}18` }]}
+              onPress={onEditAppearance && !isArchived && !compact ? (e) => {
+                e.stopPropagation();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onEditAppearance();
+              } : undefined}
+              hitSlop={onEditAppearance && !isArchived && !compact ? 4 : 0}
+            >
               {isArchived ? (
                 <Ionicons
                   name={medication.status === "storage" ? "archive" : "time"}
@@ -225,7 +222,7 @@ export function MedicationCard({
                   color={accentColor}
                 />
               )}
-            </View>
+            </Pressable>
             <View style={styles.info}>
               <View style={styles.nameRow}>
                 <Text style={[styles.name, { color: isArchived ? colors.textSecondary : colors.text }]} numberOfLines={1}>

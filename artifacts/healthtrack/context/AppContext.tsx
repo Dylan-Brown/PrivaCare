@@ -240,6 +240,7 @@ const DEFAULT_USER_PROFILE: UserProfile = {
   drinksAlcohol: false,
   smokesTobacco: false,
   otherDrugs: "",
+  compoundMedicationsEnabled: false,
 };
 
 const STORAGE_KEYS = {
