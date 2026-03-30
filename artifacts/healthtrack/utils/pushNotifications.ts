@@ -2,19 +2,22 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import type { Medication, SkincareProduct } from "@/context/AppContext";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowList: true,
-  }),
-});
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowList: true,
+    }),
+  });
+}
 
 const PREFIX = "vital_sch_";
 
 export async function requestNotificationPermissions(): Promise<boolean> {
+  if (Platform.OS === "web") return false;
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("vital_reminders", {
       name: "Health Reminders",
@@ -47,10 +50,11 @@ export async function scheduleAllVitalNotifications(
   medications: Medication[],
   skincareProducts: SkincareProduct[],
 ): Promise<void> {
+  if (Platform.OS === "web") return;
+
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== "granted") return;
 
-  // Group all active scheduled items by their time slots
   const timeGroups = new Map<string, string[]>();
 
   const activeMeds = medications.filter(
@@ -70,7 +74,6 @@ export async function scheduleAllVitalNotifications(
     }
   }
 
-  // Cancel all existing vital health notifications
   const existing = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     existing
@@ -78,7 +81,6 @@ export async function scheduleAllVitalNotifications(
       .map(n => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
 
-  // Schedule one daily notification per unique time slot
   for (const [time, names] of timeGroups) {
     const parts = time.split(":");
     const hour = parseInt(parts[0], 10);
@@ -88,7 +90,7 @@ export async function scheduleAllVitalNotifications(
     await Notifications.scheduleNotificationAsync({
       identifier: `${PREFIX}${time.replace(":", "_")}`,
       content: {
-        title: `Time to check Vital — ${fmt12(hour, minute)}`,
+        title: `PrivaCare — ${fmt12(hour, minute)}`,
         body: joinNames(names),
         data: { screen: "today" },
         sound: true,
@@ -103,6 +105,7 @@ export async function scheduleAllVitalNotifications(
 }
 
 export async function cancelAllVitalNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
   const existing = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     existing

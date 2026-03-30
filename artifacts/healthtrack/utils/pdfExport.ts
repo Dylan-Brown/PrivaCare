@@ -129,7 +129,7 @@ export async function generateAndSharePDF(
 </head>
 <body>
   <div class="header">
-    <h1>Vital — Health Report</h1>
+    <h1>PrivaCare — Health Report</h1>
     <p>Generated ${generatedDate} · All data is from your device only</p>
   </div>
 
@@ -141,7 +141,7 @@ export async function generateAndSharePDF(
   <div class="disclaimer">
     <strong>Medical Disclaimer:</strong> This report is generated from self-reported tracking data. It is not a clinical record and should not be used as medical advice. Always consult your healthcare provider regarding your medications and skincare.
   </div>
-  <div class="footer">Vital — 100% private, all data on-device · ${today}</div>
+  <div class="footer">PrivaCare — 100% private, all data on-device · ${today}</div>
 </body>
 </html>`;
 
@@ -151,7 +151,7 @@ export async function generateAndSharePDF(
     if (canShare) {
       await Sharing.shareAsync(uri, {
         mimeType: "application/pdf",
-        dialogTitle: "Share Vital Health Report",
+        dialogTitle: "Share PrivaCare Health Report",
         UTI: "com.adobe.pdf",
       });
       return { success: true, message: "PDF ready to share." };

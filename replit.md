@@ -41,7 +41,7 @@ artifacts-monorepo/
 An iOS-first personal health tracking app built with Expo React Native.
 
 ### App Name
-**Vital** — personal iOS-first health tracking app
+**PrivaCare** — privacy-first iOS-first personal health tracking app (previously named "Vital")
 
 ### Features
 
@@ -116,9 +116,16 @@ An iOS-first personal health tracking app built with Expo React Native.
 - Long-press on archived product: Restore to Active, (move between storage/history), Delete
 - Notes field in Add/Edit Skincare Product modal (labeled "NOTES (OPTIONAL)")
 
+#### Appearance / Theme
+- `context/ThemeContext.tsx` — provides `ThemeProvider`, `useThemeContext()`, `SchemeOverride` type
+- Stored in AsyncStorage under key `@privacre_theme` ("light" | "dark" | "system")
+- Wraps the entire app in `_layout.tsx` (outermost, around SafeAreaProvider)
+- Settings screen has an APPEARANCE section with Light / Auto / Dark three-way toggle
+- `hooks/useTheme.ts` now re-exports `useThemeContext()` for backward compatibility
+
 #### Welcome Onboarding Modal
 - `components/onboarding/WelcomeModal.tsx` — shown on first launch only (key `@vital_welcome_shown`)
-- 6 swipeable cards: Welcome to Vital, Today Timeline, Medications, Skincare, Reminders, 100% Private
+- 6 swipeable cards: Welcome to PrivaCare, Today Timeline, Medications, Skincare, Reminders, 100% Private
 - Dot navigation, Next/Get Started button, Skip shortcut
 - Privacy-focused last card
 
@@ -138,7 +145,7 @@ An iOS-first personal health tracking app built with Expo React Native.
 - `DayLog` keyed by `"YYYY-MM-DD"`: `{ date, entries: DayLogEntry[], reactionNotes: SkincareReactionNote[] }`
 - `DayLogEntry`: `{ id, itemId, itemName, itemType, scheduledTime, isComplete, completedAt? }`
 - `SkincareProductStatus`: `"active" | "storage" | "history"`
-- Storage keys: `@vital_day_logs`, `@vital_notifications`, `@vital_disclaimer_date`, `@vital_interaction_disclosure_shown`, `@vital_insights_last_weekly`, `@vital_insights_last_monthly`, `@vital_welcome_shown`, `@vital_healthkit_prompted`
+- Storage keys: `@vital_day_logs`, `@vital_notifications`, `@vital_disclaimer_date`, `@vital_interaction_disclosure_shown`, `@vital_insights_last_weekly`, `@vital_insights_last_monthly`, `@vital_welcome_shown`, `@vital_healthkit_prompted`, `@privacre_theme`
 
 ### Utilities
 - `utils/scheduleCompute.ts` — `shouldAppearOnDate()`, `formatTime()`, `formatNavDate()`, `todayString()`, `toDateString()`, `isDateExpired()`, `isDateExpiringSoon()`

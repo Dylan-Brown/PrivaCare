@@ -31,16 +31,16 @@ function getPromptContent(promptCount: number, colors: ReturnType<typeof useThem
   if (promptCount === 0) {
     return {
       icon: "heart",
-      title: "Support Private Health Tracking",
+      title: "Support PrivaCare",
       body: (
         <>
-          Vital is free and keeps all your health data{" "}
+          PrivaCare is free and keeps all your health data{" "}
           <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.text }}>
             100% on your device
           </Text>
           {" "}— no subscriptions, no accounts, no servers.
           {"\n\n"}
-          If this app helps you stay on top of your health, consider a small donation to keep
+          If PrivaCare helps you stay on top of your health, consider a small donation to keep
           it ad-free and independent.
         </>
       ),
@@ -54,14 +54,14 @@ function getPromptContent(promptCount: number, colors: ReturnType<typeof useThem
       title: "You're Still Here — Thank You",
       body: (
         <>
-          It means a lot that you keep coming back to Vital. Your health data
+          It means a lot that you keep coming back to PrivaCare. Your health data
           stays{" "}
           <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.text }}>
             completely private
           </Text>
           {" "}— always on your device, never shared.
           {"\n\n"}
-          If Vital has been useful, a small donation goes a long way for an
+          If PrivaCare has been useful, a small donation goes a long way for an
           independent developer.
         </>
       ),
@@ -74,7 +74,7 @@ function getPromptContent(promptCount: number, colors: ReturnType<typeof useThem
     title: "A Quick Reminder",
     body: (
       <>
-        Vital remains free, ad-free, and fully private thanks to donations from
+        PrivaCare remains free, ad-free, and fully private thanks to donations from
         people like you.
         {"\n\n"}
         If you find it useful, even a small contribution helps keep it going.

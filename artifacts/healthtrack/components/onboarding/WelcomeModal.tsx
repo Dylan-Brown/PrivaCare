@@ -26,7 +26,7 @@ const CARDS: Card[] = [
   {
     icon: "heart",
     iconColor: "#34C78B",
-    title: "Welcome to Vital",
+    title: "Welcome to PrivaCare",
     body: "Your personal health companion — private, simple, and always on your device.",
   },
   {
@@ -51,7 +51,7 @@ const CARDS: Card[] = [
     icon: "notifications-outline",
     iconColor: "#FF9F0A",
     title: "Reminders",
-    body: "Vital sends you a notification at each scheduled time so you never miss a dose or routine step.",
+    body: "PrivaCare sends you a notification at each scheduled time so you never miss a dose or routine step.",
   },
   {
     icon: "lock-closed",

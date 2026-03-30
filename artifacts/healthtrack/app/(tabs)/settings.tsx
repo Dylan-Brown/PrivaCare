@@ -23,6 +23,7 @@ import Animated, {
 
 import { useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
+import { useThemeContext, type SchemeOverride } from "@/context/ThemeContext";
 import {
   BackupData,
   exportBackup,
@@ -135,6 +136,7 @@ function StatusBanner({ state, message }: { state: ActionState; message: string 
 
 export default function SettingsScreen() {
   const { colors } = useTheme();
+  const { colorSchemeOverride, setColorSchemeOverride } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs, dayLogs, userProfile, setUserProfile } = useApp();
   const otherDrugsRef = useRef<TextInput>(null);
@@ -294,6 +296,48 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <SectionHeader title="APPEARANCE" />
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.rowItem, styles.rowItemLast]}>
+          <View style={[styles.rowIcon, { backgroundColor: `${colors.tint}20` }]}>
+            <Ionicons name="moon-outline" size={18} color={colors.tint} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Theme</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+              {colorSchemeOverride === "system" ? "Follows device setting" : colorSchemeOverride === "dark" ? "Dark mode" : "Light mode"}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {(["light", "system", "dark"] as SchemeOverride[]).map((opt) => {
+              const active = colorSchemeOverride === opt;
+              const label = opt === "light" ? "Light" : opt === "system" ? "Auto" : "Dark";
+              return (
+                <Pressable
+                  key={opt}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setColorSchemeOverride(opt);
+                  }}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: active ? colors.tint : colors.backgroundSecondary,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: active ? colors.tint : colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: active ? "#fff" : colors.textSecondary }}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+
       {Platform.OS === "ios" && (
         <>
           <SectionHeader title="APPLE HEALTH" />
@@ -333,7 +377,7 @@ export default function SettingsScreen() {
             <View style={[styles.hkInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="information-circle-outline" size={15} color={colors.textSecondary} />
               <Text style={[styles.hkInfoText, { color: colors.textSecondary }]}>
-                When you log a medication in Vital, a{" "}
+                When you log a medication in PrivaCare, a{" "}
                 <Text style={{ fontFamily: "Inter_600SemiBold" }}>Medication Dose Event</Text> is written to
                 Apple Health. Your dose history will appear in the Health app under{" "}
                 <Text style={{ fontFamily: "Inter_600SemiBold" }}>Browse → Other Data → Medications</Text>.
@@ -531,7 +575,7 @@ export default function SettingsScreen() {
           iconColor={colors.amber}
           iconBg={colors.amberLight}
           title="Restore from Backup"
-          subtitle="Choose a Vital backup (.json) to restore your data"
+          subtitle="Choose a PrivaCare backup (.json) to restore your data"
           onPress={importState === "loading" ? undefined : handleImport}
           disabled={importState === "loading"}
           last
@@ -586,7 +630,7 @@ export default function SettingsScreen() {
       </View>
 
       <Text style={[styles.footerNote, { color: colors.textTertiary }]}>
-        Vital · All data stored on-device only
+        PrivaCare · All data stored on-device only
       </Text>
     </ScrollView>
   );

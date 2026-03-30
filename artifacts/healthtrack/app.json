@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Vital",
-    "slug": "healthtrack",
+    "name": "PrivaCare",
+    "slug": "privacre",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "healthtrack",
+    "scheme": "privacre",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,17 +15,20 @@
     },
     "ios": {
       "supportsTablet": false,
+      "bundleIdentifier": "me.dylbr.privacre",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Vital reads from Apple Health to show your health context alongside your medication logs.",
-        "NSHealthUpdateUsageDescription": "Vital writes medication dose events to Apple Health so your logs appear in your Health app timeline."
+        "NSHealthShareUsageDescription": "PrivaCare reads from Apple Health to show your health context alongside your medication logs.",
+        "NSHealthUpdateUsageDescription": "PrivaCare writes medication dose events to Apple Health so your logs appear in your Health app timeline."
       }
     },
-    "android": {},
+    "android": {
+      "package": "me.dylbr.privacre"
+    },
     "web": {
       "favicon": "./assets/images/icon.png",
-      "name": "Vital – Health Tracker",
-      "shortName": "Vital",
-      "description": "Personal health tracking for medications and skincare routines.",
+      "name": "PrivaCare – Private Health Tracker",
+      "shortName": "PrivaCare",
+      "description": "Private health tracking for medications and skincare routines. All data stays on your device.",
       "themeColor": "#34C78B",
       "backgroundColor": "#ffffff",
       "lang": "en"
@@ -42,8 +45,8 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Vital reads from Apple Health to show your health context alongside your medication logs.",
-          "NSHealthUpdateUsageDescription": "Vital writes medication dose events to Apple Health so your logs appear in your Health app timeline."
+          "NSHealthShareUsageDescription": "PrivaCare reads from Apple Health to show your health context alongside your medication logs.",
+          "NSHealthUpdateUsageDescription": "PrivaCare writes medication dose events to Apple Health so your logs appear in your Health app timeline."
         }
       ]
     ],

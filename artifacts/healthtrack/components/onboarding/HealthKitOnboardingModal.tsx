@@ -95,7 +95,7 @@ export function HealthKitOnboardingModal({ visible, onDone }: Props) {
             Connect Apple Health?
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Vital can log your medication doses to Apple Health so they appear
+            PrivaCare can log your medication doses to Apple Health so they appear
             alongside your other health data.
           </Text>
 

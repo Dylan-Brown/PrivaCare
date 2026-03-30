@@ -1,7 +1,7 @@
 {
-  "name": "Vital – Health Tracker",
-  "short_name": "Vital",
-  "description": "Personal health tracking for medications and skincare routines.",
+  "name": "PrivaCare – Private Health Tracker",
+  "short_name": "PrivaCare",
+  "description": "Private health tracking for medications and skincare routines. All data stays on your device.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

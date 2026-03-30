@@ -8,7 +8,7 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:unit": "node /home/runner/workspace/artifacts/api-server/node_modules/.bin/tsx /home/runner/workspace/artifacts/healthtrack/__tests__/scheduleCompute.test.ts && node /home/runner/workspace/artifacts/api-server/node_modules/.bin/tsx /home/runner/workspace/artifacts/healthtrack/__tests__/adherence.test.ts"
+    "test:unit": "node /home/runner/workspace/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.cjs /home/runner/workspace/artifacts/healthtrack/__tests__/scheduleCompute.test.ts && node /home/runner/workspace/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.cjs /home/runner/workspace/artifacts/healthtrack/__tests__/adherence.test.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -62,7 +62,7 @@
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.21",
     "expo-notifications": "~0.32.16",
-    "expo-print": "^55.0.9",
+    "expo-print": "^15.0.8",
     "expo-sharing": "~14.0.8"
   }
 }
