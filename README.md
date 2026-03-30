@@ -2,15 +2,19 @@
 
 ---
 
-# Vital — Personal Health Tracker
+# Vital — Private Health Tracker
 
-**Vital** is an iOS-first personal health tracking app built with Expo React Native. It helps you stay consistent with medications and skincare routines through smart scheduling, adherence tracking, and daily push reminders — all without sending a single byte of your data to a server.
+> **Your health data belongs to you — and only you.**
+> No account. No cloud. No tracking. Everything stays on your device, always.
+
+**Vital** is an iOS-first personal health tracking app built with Expo React Native. It helps you stay consistent with medications and skincare routines through smart scheduling, adherence tracking, and daily push reminders — with a hard privacy guarantee: **not one byte of your health data ever leaves your device.**
 
 ---
 
 ## Contents
 
 - [Why Vital](#why-vital)
+- [Privacy by Design](#privacy-by-design)
 - [Features](#features)
   - [Today Timeline](#today-timeline)
   - [Medication Tracking](#medication-tracking)
@@ -19,7 +23,6 @@
   - [Adherence View](#adherence-view)
   - [Push Notifications](#push-notifications)
   - [PDF Health Report](#pdf-health-report)
-  - [100% On-Device Storage](#100-on-device-storage)
 - [Getting Started](#getting-started)
 - [Tech Stack](#tech-stack)
 
@@ -27,9 +30,35 @@
 
 ## Why Vital
 
-Most health apps ask for an account, sync your data to the cloud, and monetise it. Vital does none of that. Everything you log — medications, skincare products, dose completions, reactions — lives in encrypted on-device storage. There is no backend, no login, no subscription.
+Health data is among the most sensitive information about a person. Despite this, most health apps treat it as a product:
 
-The goal is simple: help you actually take your medications and follow your skincare routine, and give you honest feedback on how well you're doing.
+- They require an account just to use the app
+- They sync your medications and routines to their servers
+- They sell anonymised (or not-so-anonymised) data to advertisers, insurers, or research partners
+- They can be subpoenaed, breached, or shut down
+
+Vital is built on a different premise: **the app is a tool, not a service.** It runs entirely on your phone. There is no backend server, no user database, no analytics SDK, and no way for anyone other than you to access what you log.
+
+The tracking goal is simple — help you actually take your medications and follow your skincare routine, and give you honest, private feedback on how well you're doing.
+
+---
+
+## Privacy by Design
+
+Privacy in Vital is not a setting you toggle. It is the architecture.
+
+| What other apps do | What Vital does |
+|--------------------|-----------------|
+| Require account creation | No account, ever |
+| Sync data to the cloud | All data stays on-device in AsyncStorage |
+| Send usage analytics | No analytics SDK of any kind |
+| Expose data to third-party SDKs | No third-party SDKs with data access |
+| Risk exposure via data breach | Nothing to breach — no server, no database |
+| Query external APIs with identifiable data | Drug interaction checks use only generic drug names, no identifiers |
+
+**The only outbound network request Vital makes** is an anonymous query to the NIH OpenFDA drug interaction API — using only the generic names of your medications, with no device ID, no account token, and no other metadata attached. You can verify this by inspecting the network tab.
+
+**Backup & Restore** — you are in full control of your data. You can export a complete JSON backup at any time from Settings and restore it on any device running Vital. Your backup file goes wherever you send it — no upload required.
 
 ---
 
@@ -201,20 +230,6 @@ The file is shared via the native iOS share sheet so you can send it to your doc
 
 ---
 
-### 100% On-Device Storage
-
-Vital stores everything in encrypted on-device storage using AsyncStorage. There is no user account, no cloud sync, and no analytics SDK.
-
-**What never leaves your device:**
-- Medication and skincare data
-- Dose completion history
-- Reaction notes
-- Notification preferences
-- Settings
-
-**Backup & Restore** — export a JSON backup file and restore it on any device running Vital.
-
----
 
 ## Getting Started
 
