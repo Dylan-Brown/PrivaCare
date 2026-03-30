@@ -395,6 +395,18 @@ export default function TodayScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
           </Pressable>
         )}
+
+        <Pressable
+          style={[styles.logReactionsBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push("/adherence")}
+        >
+          <Ionicons name="bar-chart-outline" size={20} color={colors.tint} />
+          <View style={styles.logReactionsBtnInfo}>
+            <Text style={[styles.logReactionsBtnTitle, { color: colors.text }]}>How Am I Doing?</Text>
+            <Text style={[styles.logReactionsBtnSub, { color: colors.textSecondary }]}>Adherence streaks and monthly overview</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </Pressable>
       </ScrollView>
 
       <GroupDetailModal

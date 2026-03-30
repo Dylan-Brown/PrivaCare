@@ -66,6 +66,7 @@ export default function MedicationsScreen() {
   const [interactions, setInteractions]   = useState<DrugInteraction[]>([]);
   const [interactionWarnings, setInteractionWarnings] = useState<string[]>([]);
   const [interactionsCheckedAt, setInteractionsCheckedAt] = useState<string | null>(null);
+  const [interactionNetworkError, setInteractionNetworkError] = useState(false);
   const interactionDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const runInteractionCheck = useCallback(async () => {
@@ -76,14 +77,25 @@ export default function MedicationsScreen() {
       setInteractions([]);
       setInteractionWarnings([]);
       setInteractionsCheckedAt(null);
+      setInteractionNetworkError(false);
       return;
     }
     setInteractionsLoading(true);
+    setInteractionNetworkError(false);
     try {
       const result = await checkAllInteractions(activeMedNames, userProfile);
       setInteractions(result.interactions);
       setInteractionWarnings(result.warnings);
       setInteractionsCheckedAt(result.checkedAt);
+    } catch (err: any) {
+      const isNetworkErr =
+        err?.message?.toLowerCase().includes("network") ||
+        err?.message?.toLowerCase().includes("fetch") ||
+        err?.message?.toLowerCase().includes("failed to fetch") ||
+        err?.name === "TypeError";
+      if (isNetworkErr) {
+        setInteractionNetworkError(true);
+      }
     } finally {
       setInteractionsLoading(false);
     }
@@ -278,6 +290,7 @@ export default function MedicationsScreen() {
             warnings={interactionWarnings}
             lastChecked={interactionsCheckedAt}
             onRecheck={runInteractionCheck}
+            networkError={interactionNetworkError}
           />
         )}
 

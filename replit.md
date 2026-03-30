@@ -92,27 +92,76 @@ An iOS-first personal health tracking app built with Expo React Native.
 #### Compound Medications
 - Multiple ingredients; compound badge on card
 
+#### Push Notifications
+- `utils/pushNotifications.ts` — schedules daily notifications per time slot using `expo-notifications`
+- Identifier prefix `vital_sch_` — ONE notification per unique scheduled time, listing all items due
+- Auto-reschedules (debounced 1.5s) whenever medications or skincare products change (AppContext effect)
+- `requestNotificationPermissions()` called on app launch in `_layout.tsx`
+- Notification tap navigates to Today tab
+
+#### Adherence View ("How Am I Doing?")
+- `/adherence` modal screen — accessible via "How Am I Doing?" button at bottom of Today tab
+- Medications / Skincare tab switcher
+- Swipeable monthly calendar: green = all done, amber = partial, red = missed, grey = future
+- Per-item adherence breakdown: adherence %, expected/completed/missed days, current & longest streak
+- Overall adherence badge (e.g. "Outstanding!" / "Well done!" / "Keep going")
+- `utils/adherence.ts` — `computeItemAdherence()`, `buildMedAdherence()`, `buildSkincareAdherence()`, `computeMonthDayAdherence()`
+
+#### Skincare Feature Parity with Medications
+- `SkincareProduct` now has `notes?: string` and `status?: "active" | "storage" | "history"`
+- `migrateSkincareProduct()` defaults `status: "active"` for existing data
+- `archiveSkincareProduct(id, "storage"|"history")` and `unarchiveSkincareProduct(id)` in AppContext
+- Long-press on a skincare product shows: Edit, Move to Storage, Archive (History), Delete
+- Storage and History products shown in collapsible sections below the active list
+- Long-press on archived product: Restore to Active, (move between storage/history), Delete
+- Notes field in Add/Edit Skincare Product modal (labeled "NOTES (OPTIONAL)")
+
+#### Welcome Onboarding Modal
+- `components/onboarding/WelcomeModal.tsx` — shown on first launch only (key `@vital_welcome_shown`)
+- 6 swipeable cards: Welcome to Vital, Today Timeline, Medications, Skincare, Reminders, 100% Private
+- Dot navigation, Next/Get Started button, Skip shortcut
+- Privacy-focused last card
+
+#### PDF Health Report Export
+- `utils/pdfExport.ts` — generates and shares a PDF using `expo-print` + `expo-sharing`
+- Report includes: medication adherence stats, skincare adherence stats, medication details, skincare details, medical disclaimer
+- Button in Settings under "REPORTS" section ("Export Health Report (PDF)")
+- Uses the same `buildMedAdherence()` / `buildSkincareAdherence()` utilities as the adherence screen
+
+#### NIH API Offline Retry Dialog
+- `InteractionsBanner` now accepts `networkError?: boolean` prop
+- When network error detected: shows a red "Couldn't reach NIH — offline?" banner with Retry button
+- Error detection in `medications.tsx`: catches `TypeError` and messages containing "network"/"fetch"
+
 ### Data Types (AppContext)
 - `ItemSchedule`, `DayLogEntry`, `DayLog`, `SkincareReactionNote`, `AppNotification`
 - `DayLog` keyed by `"YYYY-MM-DD"`: `{ date, entries: DayLogEntry[], reactionNotes: SkincareReactionNote[] }`
 - `DayLogEntry`: `{ id, itemId, itemName, itemType, scheduledTime, isComplete, completedAt? }`
-- Storage keys: `@vital_day_logs`, `@vital_notifications`, `@vital_disclaimer_date`, `@vital_interaction_disclosure_shown`, `@vital_insights_last_weekly`, `@vital_insights_last_monthly`
+- `SkincareProductStatus`: `"active" | "storage" | "history"`
+- Storage keys: `@vital_day_logs`, `@vital_notifications`, `@vital_disclaimer_date`, `@vital_interaction_disclosure_shown`, `@vital_insights_last_weekly`, `@vital_insights_last_monthly`, `@vital_welcome_shown`, `@vital_healthkit_prompted`
 
-### Utility: `utils/scheduleCompute.ts`
-- `shouldAppearOnDate(schedule, date)` — checks if an item should appear on a given date
-- `formatTime(hhmm)` → "8:00 AM"
-- `formatNavDate(date)` → "Today" / "Yesterday" / "March 28"
-- `todayString()`, `toDateString(date)`
-- `isDateExpired(date)`, `isDateExpiringSoon(date, daysThreshold=30)`
+### Utilities
+- `utils/scheduleCompute.ts` — `shouldAppearOnDate()`, `formatTime()`, `formatNavDate()`, `todayString()`, `toDateString()`, `isDateExpired()`, `isDateExpiringSoon()`
+- `utils/adherence.ts` — adherence computation and monthly calendar data
+- `utils/pdfExport.ts` — HTML→PDF generation and sharing
+- `utils/pushNotifications.ts` — Expo notifications scheduling
+
+### Tests (`artifacts/healthtrack/__tests__/`)
+- `scheduleCompute.test.ts` — 10 unit tests for schedule logic (run with `pnpm --filter @workspace/healthtrack test:unit`)
+- `adherence.test.ts` — 11 unit tests for adherence calculation (streaks, pct, edge cases)
+- E2E tests cover: Welcome modal, "How Am I Doing?" button, adherence screen, skincare notes field, settings PDF button
 
 ### Components
 - `components/ui/TimePicker.tsx` — hour/minute/AM-PM chip picker modal
 - `components/today/GroupDetailModal.tsx` — bottom sheet for group item detail
 - `components/medications/AddMedicationModal.tsx` — full schedule + notes + disclaimers
-- `components/skincare/AddSkincareProductModal.tsx` — full schedule + expiry + disclaimers
+- `components/skincare/AddSkincareProductModal.tsx` — full schedule + expiry + notes + disclaimers
+- `components/onboarding/WelcomeModal.tsx` — first-launch onboarding carousel
+- `components/medications/InteractionsBanner.tsx` — drug interaction display + offline retry UI
 
 ### Screens
-- `app/(tabs)/index.tsx` — Today Timeline Dashboard
+- `app/(tabs)/index.tsx` — Today Timeline Dashboard + "How Am I Doing?" CTA
+- `app/adherence.tsx` — Adherence modal screen with calendar and per-item stats
 - `app/notifications.tsx` — Notifications modal (push from bell icon)
 - `app/skincare-reactions.tsx` — Skincare reaction logger modal
 

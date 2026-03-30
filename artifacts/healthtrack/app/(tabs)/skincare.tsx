@@ -32,6 +32,8 @@ export default function SkincareScreen() {
     deleteSkincareRoutine,
     reorderSkincareProducts,
     updateSkincareProduct,
+    archiveSkincareProduct,
+    unarchiveSkincareProduct,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<TabType>("products");
@@ -44,7 +46,12 @@ export default function SkincareScreen() {
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
-  const sortedProducts = [...skincareProducts].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  const sortedProducts = [...skincareProducts]
+    .filter(p => !p.status || p.status === "active")
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+  const storageProducts = skincareProducts.filter(p => p.status === "storage");
+  const historyProducts = skincareProducts.filter(p => p.status === "history");
 
   const moveUp = (idx: number) => {
     if (idx === 0) return;
@@ -167,7 +174,7 @@ export default function SkincareScreen() {
                 <View style={[styles.reorderHint, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}30` }]}>
                   <Ionicons name="information-circle-outline" size={15} color={colors.accent} />
                   <Text style={[styles.reorderHintText, { color: colors.accent }]}>
-                    Use arrows to reorder. Tap the palette icon to edit appearance. Tap Done when finished.
+                    Use arrows to reorder. Tap Done when finished.
                   </Text>
                 </View>
               )}
@@ -186,6 +193,8 @@ export default function SkincareScreen() {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                       Alert.alert(product.name, "What would you like to do?", [
                         { text: "Edit", onPress: () => { setEditProduct(product); setShowAddProduct(true); } },
+                        { text: "Move to Storage", onPress: () => archiveSkincareProduct(product.id, "storage") },
+                        { text: "Archive (History)", onPress: () => archiveSkincareProduct(product.id, "history") },
                         { text: "Delete", style: "destructive", onPress: () => handleDeleteProduct(product) },
                         { text: "Cancel", style: "cancel" },
                       ]);
@@ -193,6 +202,67 @@ export default function SkincareScreen() {
                   />
                 ))}
               </View>
+
+              {/* Storage section */}
+              {storageProducts.length > 0 && (
+                <View style={[styles.archivedSection, { borderColor: colors.border }]}>
+                  <View style={styles.archivedHeader}>
+                    <Ionicons name="archive-outline" size={15} color={colors.textSecondary} />
+                    <Text style={[styles.archivedTitle, { color: colors.textSecondary }]}>
+                      IN STORAGE ({storageProducts.length})
+                    </Text>
+                  </View>
+                  {storageProducts.map(p => (
+                    <Pressable
+                      key={p.id}
+                      style={[styles.archivedRow, { borderBottomColor: colors.borderLight }]}
+                      onLongPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        Alert.alert(p.name, "Product is in storage", [
+                          { text: "Restore to Active", onPress: () => unarchiveSkincareProduct(p.id) },
+                          { text: "Move to History", onPress: () => archiveSkincareProduct(p.id, "history") },
+                          { text: "Delete", style: "destructive", onPress: () => handleDeleteProduct(p) },
+                          { text: "Cancel", style: "cancel" },
+                        ]);
+                      }}
+                    >
+                      <View style={[styles.archivedDot, { backgroundColor: p.color }]} />
+                      <Text style={[styles.archivedName, { color: colors.textSecondary }]}>{p.name}</Text>
+                      <Text style={[styles.archivedBadge, { color: colors.textTertiary }]}>storage</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {/* History section */}
+              {historyProducts.length > 0 && (
+                <View style={[styles.archivedSection, { borderColor: colors.border }]}>
+                  <View style={styles.archivedHeader}>
+                    <Ionicons name="time-outline" size={15} color={colors.textSecondary} />
+                    <Text style={[styles.archivedTitle, { color: colors.textSecondary }]}>
+                      HISTORY ({historyProducts.length})
+                    </Text>
+                  </View>
+                  {historyProducts.map(p => (
+                    <Pressable
+                      key={p.id}
+                      style={[styles.archivedRow, { borderBottomColor: colors.borderLight }]}
+                      onLongPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        Alert.alert(p.name, "Product is in history", [
+                          { text: "Restore to Active", onPress: () => unarchiveSkincareProduct(p.id) },
+                          { text: "Delete", style: "destructive", onPress: () => handleDeleteProduct(p) },
+                          { text: "Cancel", style: "cancel" },
+                        ]);
+                      }}
+                    >
+                      <View style={[styles.archivedDot, { backgroundColor: p.color }]} />
+                      <Text style={[styles.archivedName, { color: colors.textTertiary }]}>{p.name}</Text>
+                      <Text style={[styles.archivedBadge, { color: colors.textTertiary }]}>history</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </>
           )
         ) : (
@@ -298,6 +368,22 @@ const styles = StyleSheet.create({
   },
   segmentText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   list: { gap: 2 },
+  archivedSection: {
+    borderRadius: 12, borderWidth: 1, overflow: "hidden", marginTop: 4,
+  },
+  archivedHeader: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+  archivedTitle: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  archivedRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 14, paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  archivedDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  archivedName: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
+  archivedBadge: { fontSize: 11, fontFamily: "Inter_400Regular" },
   emptyState: { alignItems: "center", paddingVertical: 50, gap: 12 },
   emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
   emptyTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },

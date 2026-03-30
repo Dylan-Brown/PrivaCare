@@ -16,6 +16,7 @@ type Props = {
   warnings: string[];
   lastChecked: string | null;
   onRecheck: () => void;
+  networkError?: boolean;
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -33,9 +34,33 @@ function severityColor(severity: string): string {
   return SEVERITY_COLORS.unknown;
 }
 
-export function InteractionsBanner({ interactions, loading, warnings, lastChecked, onRecheck }: Props) {
+export function InteractionsBanner({ interactions, loading, warnings, lastChecked, onRecheck, networkError }: Props) {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
+
+  if (networkError) {
+    return (
+      <View style={[styles.container, { backgroundColor: `#FF6B6B12`, borderColor: `#FF6B6B40` }]}>
+        <View style={styles.headerRow}>
+          <View style={[styles.iconWrap, { backgroundColor: "#FF6B6B20" }]}>
+            <Ionicons name="cloud-offline-outline" size={18} color="#FF6B6B" />
+          </View>
+          <View style={styles.headerInfo}>
+            <Text style={[styles.headerText, { color: "#FF6B6B" }]}>
+              Couldn't reach NIH — offline?
+            </Text>
+            <Text style={[styles.checkedAt, { color: colors.textTertiary }]}>
+              Interaction data requires an internet connection
+            </Text>
+          </View>
+          <Pressable onPress={onRecheck} style={[styles.retryBtn, { backgroundColor: "#FF6B6B20", borderColor: "#FF6B6B40" }]}>
+            <Ionicons name="refresh" size={14} color="#FF6B6B" />
+            <Text style={[styles.retryText, { color: "#FF6B6B" }]}>Retry</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -161,6 +186,12 @@ const styles = StyleSheet.create({
   checkedAt: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
   rightRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   recheckBtn: { padding: 4 },
+  retryBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 10, borderWidth: 1,
+  },
+  retryText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   interactionList: {
     paddingHorizontal: 13, paddingBottom: 13, gap: 8,
   },
