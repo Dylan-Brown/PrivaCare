@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 
 const STORAGE_KEYS = {
   MEDICATIONS: "@healthtrack_medications",
@@ -11,7 +11,12 @@ const STORAGE_KEYS = {
   SKINCARE_PRODUCTS: "@healthtrack_skincare_products",
   SKINCARE_ROUTINES: "@healthtrack_skincare_routines",
   SKINCARE_LOGS: "@healthtrack_skincare_logs",
+  DAY_LOGS: "@vital_day_logs",
+  USER_PROFILE: "@vital_user_profile",
+  NOTIFICATIONS: "@vital_notifications",
 };
+
+const APP_NAME = "PrivaCare";
 
 export type BackupData = {
   version: number;
@@ -23,34 +28,46 @@ export type BackupData = {
   skincareProducts: unknown;
   skincareRoutines: unknown;
   skincareLogs: unknown;
+  dayLogs: unknown;
+  userProfile: unknown;
+  notifications: unknown;
 };
 
-export async function exportBackup(): Promise<{ success: boolean; message: string }> {
-  try {
-    const [meds, groups, medLogs, products, routines, skinLogs] = await Promise.all([
+async function gatherBackupData(): Promise<BackupData> {
+  const [meds, groups, medLogs, products, routines, skinLogs, dayLogs, userProfile, notifications] =
+    await Promise.all([
       AsyncStorage.getItem(STORAGE_KEYS.MEDICATIONS),
       AsyncStorage.getItem(STORAGE_KEYS.MED_GROUPS),
       AsyncStorage.getItem(STORAGE_KEYS.MED_LOGS),
       AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_PRODUCTS),
       AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_ROUTINES),
       AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_LOGS),
+      AsyncStorage.getItem(STORAGE_KEYS.DAY_LOGS),
+      AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE),
+      AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
     ]);
+  return {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    appName: APP_NAME,
+    medications: meds ? JSON.parse(meds) : [],
+    medicationGroups: groups ? JSON.parse(groups) : [],
+    medicationLogs: medLogs ? JSON.parse(medLogs) : [],
+    skincareProducts: products ? JSON.parse(products) : [],
+    skincareRoutines: routines ? JSON.parse(routines) : [],
+    skincareLogs: skinLogs ? JSON.parse(skinLogs) : [],
+    dayLogs: dayLogs ? JSON.parse(dayLogs) : {},
+    userProfile: userProfile ? JSON.parse(userProfile) : null,
+    notifications: notifications ? JSON.parse(notifications) : [],
+  };
+}
 
-    const backup: BackupData = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      appName: "Vital",
-      medications: meds ? JSON.parse(meds) : [],
-      medicationGroups: groups ? JSON.parse(groups) : [],
-      medicationLogs: medLogs ? JSON.parse(medLogs) : [],
-      skincareProducts: products ? JSON.parse(products) : [],
-      skincareRoutines: routines ? JSON.parse(routines) : [],
-      skincareLogs: skinLogs ? JSON.parse(skinLogs) : [],
-    };
-
+export async function exportBackup(): Promise<{ success: boolean; message: string }> {
+  try {
+    const backup = await gatherBackupData();
     const json = JSON.stringify(backup, null, 2);
     const dateStr = new Date().toISOString().split("T")[0];
-    const filename = `vital-backup-${dateStr}.json`;
+    const filename = `privacre-backup-${dateStr}.json`;
 
     if (Platform.OS === "web") {
       const blob = new Blob([json], { type: "application/json" });
@@ -64,14 +81,10 @@ export async function exportBackup(): Promise<{ success: boolean; message: strin
     }
 
     const docDir = FileSystem.documentDirectory;
-    if (!docDir) {
-      return { success: false, message: "Cannot access device storage" };
-    }
+    if (!docDir) return { success: false, message: "Cannot access device storage" };
 
     const filePath = `${docDir}${filename}`;
-    await FileSystem.writeAsStringAsync(filePath, json, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
+    await FileSystem.writeAsStringAsync(filePath, json, { encoding: FileSystem.EncodingType.UTF8 });
 
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
@@ -91,40 +104,16 @@ export async function exportBackup(): Promise<{ success: boolean; message: strin
 
 export async function saveBackupToDocuments(): Promise<{ success: boolean; path?: string; message: string }> {
   try {
-    const [meds, groups, medLogs, products, routines, skinLogs] = await Promise.all([
-      AsyncStorage.getItem(STORAGE_KEYS.MEDICATIONS),
-      AsyncStorage.getItem(STORAGE_KEYS.MED_GROUPS),
-      AsyncStorage.getItem(STORAGE_KEYS.MED_LOGS),
-      AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_PRODUCTS),
-      AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_ROUTINES),
-      AsyncStorage.getItem(STORAGE_KEYS.SKINCARE_LOGS),
-    ]);
-
-    const backup: BackupData = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      appName: "Vital",
-      medications: meds ? JSON.parse(meds) : [],
-      medicationGroups: groups ? JSON.parse(groups) : [],
-      medicationLogs: medLogs ? JSON.parse(medLogs) : [],
-      skincareProducts: products ? JSON.parse(products) : [],
-      skincareRoutines: routines ? JSON.parse(routines) : [],
-      skincareLogs: skinLogs ? JSON.parse(skinLogs) : [],
-    };
-
+    const backup = await gatherBackupData();
     const json = JSON.stringify(backup, null, 2);
     const dateStr = new Date().toISOString().split("T")[0];
-    const filename = `vital-backup-${dateStr}.json`;
+    const filename = `privacre-backup-${dateStr}.json`;
     const docDir = FileSystem.documentDirectory;
 
-    if (!docDir) {
-      return { success: false, message: "Cannot access device storage" };
-    }
+    if (!docDir) return { success: false, message: "Cannot access device storage" };
 
     const filePath = `${docDir}${filename}`;
-    await FileSystem.writeAsStringAsync(filePath, json, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
+    await FileSystem.writeAsStringAsync(filePath, json, { encoding: FileSystem.EncodingType.UTF8 });
 
     return { success: true, path: filePath, message: filename };
   } catch (err) {
@@ -139,7 +128,7 @@ export async function listBackups(): Promise<string[]> {
     if (!docDir) return [];
     const files = await FileSystem.readDirectoryAsync(docDir);
     return files
-      .filter(f => f.startsWith("vital-backup-") && f.endsWith(".json"))
+      .filter(f => (f.startsWith("privacre-backup-") || f.startsWith("vital-backup-")) && f.endsWith(".json"))
       .sort()
       .reverse();
   } catch {
@@ -169,8 +158,8 @@ export async function importBackup(): Promise<{
 
     const data: BackupData = JSON.parse(content);
 
-    if (!data.version || !data.appName || data.appName !== "Vital") {
-      return { success: false, message: "This file is not a valid Vital backup" };
+    if (!data.version || !data.appName || (data.appName !== "PrivaCare" && data.appName !== "Vital")) {
+      return { success: false, message: "This file is not a valid PrivaCare backup" };
     }
 
     return { success: true, message: "Backup file loaded", data };
@@ -182,14 +171,24 @@ export async function importBackup(): Promise<{
 
 export async function restoreBackup(data: BackupData): Promise<{ success: boolean; message: string }> {
   try {
-    await Promise.all([
+    const writes: Promise<void>[] = [
       AsyncStorage.setItem(STORAGE_KEYS.MEDICATIONS, JSON.stringify(data.medications || [])),
       AsyncStorage.setItem(STORAGE_KEYS.MED_GROUPS, JSON.stringify(data.medicationGroups || [])),
       AsyncStorage.setItem(STORAGE_KEYS.MED_LOGS, JSON.stringify(data.medicationLogs || [])),
       AsyncStorage.setItem(STORAGE_KEYS.SKINCARE_PRODUCTS, JSON.stringify(data.skincareProducts || [])),
       AsyncStorage.setItem(STORAGE_KEYS.SKINCARE_ROUTINES, JSON.stringify(data.skincareRoutines || [])),
       AsyncStorage.setItem(STORAGE_KEYS.SKINCARE_LOGS, JSON.stringify(data.skincareLogs || [])),
-    ]);
+    ];
+    if (data.dayLogs !== undefined) {
+      writes.push(AsyncStorage.setItem(STORAGE_KEYS.DAY_LOGS, JSON.stringify(data.dayLogs)));
+    }
+    if (data.userProfile !== undefined && data.userProfile !== null) {
+      writes.push(AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(data.userProfile)));
+    }
+    if (data.notifications !== undefined) {
+      writes.push(AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(data.notifications)));
+    }
+    await Promise.all(writes);
     return { success: true, message: "Backup restored successfully" };
   } catch (err) {
     console.error("Restore error:", err);

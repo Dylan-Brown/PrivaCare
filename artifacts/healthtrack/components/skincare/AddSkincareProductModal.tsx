@@ -40,10 +40,10 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const DISCLAIMER_TEXT =
   "Only take, use, and schedule your skincare products as directed by the manufacturer or your "
   + "healthcare provider. Do not use products to which you have known allergies. "
-  + "Vital is a personal tracking tool and is not a substitute for professional advice.";
+  + "PrivaCare is a personal tracking tool and is not a substitute for professional advice.";
 
 const DISCLOSURE_TEXT =
-  "Vital can check for potential drug interactions using the NIH RxNorm API — a free public service "
+  "PrivaCare can check for potential drug interactions using the NIH RxNorm API — a free public service "
   + "maintained by the U.S. National Library of Medicine.\n\n"
   + "Important: While your other health data stays entirely on this device, your medication names "
   + "are sent to a third-party server during an interaction check. No personal information is "

@@ -12,7 +12,7 @@ export default function Root({ children }: PropsWithChildren) {
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
 
-        <title>Vital – Health Tracker</title>
+        <title>PrivaCare – Private Health Tracker</title>
         <meta
           name="description"
           content="Personal health tracking for medications and skincare routines."
@@ -23,7 +23,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Vital" />
+        <meta name="apple-mobile-web-app-title" content="PrivaCare" />
         <link rel="apple-touch-icon" href="/icons/icon.svg" />
 
         <meta name="msapplication-TileColor" content="#34C78B" />
