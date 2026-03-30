@@ -10,7 +10,7 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import React, { useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -96,6 +96,7 @@ function RootLayoutNav() {
   const handleDonate = async () => {
     await recordDonationShown();
     setDonationVisible(false);
+    Linking.openURL("https://paypal.me/dylbrn");
   };
 
   const handleDismiss = async () => {
