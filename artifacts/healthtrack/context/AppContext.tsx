@@ -4,9 +4,11 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { logMedicationDoseToHealthKit } from "@/utils/healthKit";
+import { scheduleAllVitalNotifications } from "@/utils/pushNotifications";
 import { UserProfile } from "@/utils/drugInteractions";
 import {
   ItemSchedule,
@@ -15,7 +17,7 @@ import {
   toDateString,
 } from "@/utils/scheduleCompute";
 
-export type { UserProfile, ItemSchedule };
+export type { UserProfile, ItemSchedule, SkincareProductStatus };
 
 export type MedicationStatus = "active" | "storage" | "history";
 export type MedicationCategory = "prescription" | "generic" | "supplement";
@@ -69,6 +71,8 @@ export type MedicationLog = {
   groupName?: string;
 };
 
+export type SkincareProductStatus = "active" | "storage" | "history";
+
 export type SkincareProduct = {
   id: string;
   name: string;
@@ -80,6 +84,8 @@ export type SkincareProduct = {
   sortOrder?: number;
   schedule: ItemSchedule;
   expiryDate?: string;
+  notes?: string;
+  status?: SkincareProductStatus;
 };
 
 export type SkincareRoutine = {
@@ -164,6 +170,8 @@ type AppContextType = {
   updateSkincareProduct: (id: string, updates: Partial<SkincareProduct>) => Promise<void>;
   deleteSkincareProduct: (id: string) => Promise<void>;
   logSkincareProduct: (productId: string, routineId?: string, routineName?: string) => Promise<void>;
+  archiveSkincareProduct: (id: string, mode: "storage" | "history") => Promise<void>;
+  unarchiveSkincareProduct: (id: string) => Promise<void>;
   logSkincareRoutine: (routineId: string) => Promise<void>;
 
   addSkincareRoutine: (routine: Omit<SkincareRoutine, "id">) => Promise<void>;
@@ -233,6 +241,8 @@ function migrateSkincareProduct(p: any, index: number): SkincareProduct {
     sortOrder: p.sortOrder ?? index,
     schedule: p.schedule ?? { asNeeded: true },
     expiryDate: p.expiryDate ?? undefined,
+    notes: p.notes ?? undefined,
+    status: p.status ?? "active",
   };
 }
 
@@ -311,6 +321,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
+
+  // ─── Reschedule notifications when items change ────────────────────────────
+  const notifDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isLoading) return;
+    if (notifDebounce.current) clearTimeout(notifDebounce.current);
+    notifDebounce.current = setTimeout(() => {
+      scheduleAllVitalNotifications(medications, skincareProducts).catch(() => {});
+    }, 1500);
+    return () => {
+      if (notifDebounce.current) clearTimeout(notifDebounce.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medications, skincareProducts, isLoading]);
 
   // ─── User profile ─────────────────────────────────────────────────────────
   const setUserProfile = useCallback(async (updates: Partial<UserProfile>) => {
@@ -566,6 +590,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return updated;
       });
       return prevProducts;
+    });
+  }, []);
+
+  const archiveSkincareProduct = useCallback(async (id: string, mode: "storage" | "history") => {
+    setSkincareProducts(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, status: mode } : p);
+      AsyncStorage.setItem(STORAGE_KEYS.SKINCARE_PRODUCTS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const unarchiveSkincareProduct = useCallback(async (id: string) => {
+    setSkincareProducts(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, status: "active" as const } : p);
+      AsyncStorage.setItem(STORAGE_KEYS.SKINCARE_PRODUCTS, JSON.stringify(updated));
+      return updated;
     });
   }, []);
 
@@ -974,6 +1014,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateSkincareProduct,
     deleteSkincareProduct,
     logSkincareProduct,
+    archiveSkincareProduct,
+    unarchiveSkincareProduct,
     logSkincareRoutine,
     addSkincareRoutine,
     updateSkincareRoutine,

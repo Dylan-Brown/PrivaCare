@@ -32,6 +32,9 @@ import {
   restoreBackup,
   saveBackupToDocuments,
 } from "@/utils/backup";
+import { generateAndSharePDF } from "@/utils/pdfExport";
+import { buildMedAdherence, buildSkincareAdherence } from "@/utils/adherence";
+import { todayString } from "@/utils/scheduleCompute";
 import {
   getHealthKitSyncEnabled,
   isHealthKitAvailable,
@@ -133,12 +136,14 @@ function StatusBanner({ state, message }: { state: ActionState; message: string 
 export default function SettingsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs, userProfile, setUserProfile } = useApp();
+  const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs, dayLogs, userProfile, setUserProfile } = useApp();
   const otherDrugsRef = useRef<TextInput>(null);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   const [exportState, setExportState] = useState<ActionState>("idle");
+  const [pdfState, setPdfState] = useState<ActionState>("idle");
+  const [pdfMessage, setPdfMessage] = useState("");
   const [exportMessage, setExportMessage] = useState("");
   const [saveState, setSaveState] = useState<ActionState>("idle");
   const [saveMessage, setSaveMessage] = useState("");
@@ -184,6 +189,18 @@ export default function SettingsScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, [hkEnabled]);
+
+  const handlePdfExport = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPdfState("loading");
+    const today = todayString();
+    const medAdherence = buildMedAdherence(medications, dayLogs, today);
+    const skincareAdherence = buildSkincareAdherence(skincareProducts, dayLogs, today);
+    const result = await generateAndSharePDF(medications, skincareProducts, medAdherence, skincareAdherence);
+    setPdfState(result.success ? "success" : "error");
+    setPdfMessage(result.message);
+    setTimeout(() => setPdfState("idle"), 4000);
+  }, [medications, skincareProducts, dayLogs]);
 
   const handleExport = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -456,6 +473,26 @@ export default function SettingsScreen() {
           last
         />
       </View>
+
+      <SectionHeader title="REPORTS" />
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <RowItem
+          icon="document-text-outline"
+          iconColor="#A78BFA"
+          iconBg="#A78BFA18"
+          title="Export Health Report (PDF)"
+          subtitle="Generates a PDF with adherence stats, medication and skincare details"
+          onPress={pdfState === "loading" ? undefined : handlePdfExport}
+          disabled={pdfState === "loading"}
+          last
+          trailing={
+            pdfState === "loading" ? (
+              <ActivityIndicator size="small" color="#A78BFA" />
+            ) : undefined
+          }
+        />
+      </View>
+      <StatusBanner state={pdfState} message={pdfMessage} />
 
       <SectionHeader title="BACKUP & RESTORE" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>

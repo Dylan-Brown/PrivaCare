@@ -81,6 +81,7 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
   const [name, setName]           = useState("");
   const [brand, setBrand]         = useState("");
   const [type, setType]           = useState("Serum");
+  const [notes, setNotes]         = useState("");
   const [selectedColor, setSelectedColor] = useState(SHARED_COLORS[0]);
   const [selectedIcon, setSelectedIcon]   = useState("mci:bottle-tonic");
   const [showIconPicker, setShowIconPicker] = useState(false);
@@ -104,6 +105,7 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
       setName(editProduct.name);
       setBrand(editProduct.brand);
       setType(editProduct.type);
+      setNotes(editProduct.notes ?? "");
       setSelectedColor(editProduct.color);
       setSelectedIcon(editProduct.icon ?? "mci:bottle-tonic");
       if (editProduct.expiryDate) {
@@ -124,7 +126,7 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
         setTimes(s.times);
       }
     } else {
-      setName(""); setBrand(""); setType("Serum");
+      setName(""); setBrand(""); setType("Serum"); setNotes("");
       setSelectedColor(SHARED_COLORS[0]); setSelectedIcon("mci:bottle-tonic");
       setScheduleType(null); setFrequency("daily"); setCustomDays("3"); setTimes(["08:00"]);
       setHasExpiry(false);
@@ -166,18 +168,19 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
   const doActualSave = async () => {
     const schedule = buildSchedule();
     const expiryDate = hasExpiry ? buildExpiryDate(expiryMonth, expiryYear) : undefined;
+    const notesVal = notes.trim() || undefined;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (editProduct) {
       await updateSkincareProduct(editProduct.id, {
         name: name.trim(), brand: brand.trim(), type,
         color: selectedColor, icon: selectedIcon,
-        schedule, expiryDate,
+        schedule, expiryDate, notes: notesVal,
       });
     } else {
       await addSkincareProduct({
         name: name.trim(), brand: brand.trim(), type,
         color: selectedColor, icon: selectedIcon,
-        schedule, expiryDate,
+        schedule, expiryDate, notes: notesVal,
       });
     }
     onClose();
@@ -276,6 +279,17 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
               placeholderTextColor={colors.textTertiary}
               value={brand}
               onChangeText={setBrand}
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>NOTES (OPTIONAL)</Text>
+            <TextInput
+              style={[styles.input, styles.notesInput, { color: colors.text }]}
+              placeholder="How this product works for you, skin reactions, tips…"
+              placeholderTextColor={colors.textTertiary}
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={3}
             />
           </View>
 
@@ -514,6 +528,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8, marginBottom: 6 },
   fieldHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 8, marginTop: -2 },
   input: { fontSize: 16, fontFamily: "Inter_400Regular", paddingVertical: 4 },
+  notesInput: { minHeight: 68, textAlignVertical: "top" },
   divider: { height: 1, marginVertical: 14 },
 
   scheduleHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
