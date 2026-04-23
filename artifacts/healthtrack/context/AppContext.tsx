@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { logMedicationDoseToHealthKit } from "@/utils/healthKit";
+import { logMedicationDoseToHealthKit, saveVitalToHealthKit } from "@/utils/healthKit";
 import { scheduleAllVitalNotifications } from "@/utils/pushNotifications";
 import { UserProfile } from "@/utils/drugInteractions";
 import {
@@ -378,6 +378,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(STORAGE_KEYS.VITAL_READINGS, JSON.stringify(updated));
       return updated;
     });
+    saveVitalToHealthKit({
+      type: r.type,
+      value: r.value,
+      timestamp: r.timestamp,
+    }).catch(() => {});
   }, []);
 
   const deleteVitalReading = useCallback(async (id: string) => {
