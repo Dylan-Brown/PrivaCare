@@ -100,42 +100,6 @@ export async function requestHealthKitPermissions(): Promise<{
   }
 }
 
-export async function requestVitalsHealthKitPermissions(): Promise<{
-  success: boolean;
-  message: string;
-}> {
-  const HK = await getHK();
-  if (!HK) {
-    return {
-      success: false,
-      message:
-        "Apple Health is only available on a native iOS build.",
-    };
-  }
-  try {
-    const available = await HK.isHealthDataAvailable();
-    if (!available) {
-      return { success: false, message: "Apple Health is not available on this device." };
-    }
-    await HK.requestAuthorization({
-      toShare: [
-        "HKQuantityTypeIdentifierOxygenSaturation",
-        "HKQuantityTypeIdentifierBodyTemperature",
-        "HKCorrelationTypeIdentifierBloodPressure",
-        "HKQuantityTypeIdentifierBloodPressureSystolic",
-        "HKQuantityTypeIdentifierBloodPressureDiastolic",
-      ],
-      toRead: [],
-    });
-    return { success: true, message: "Vitals access granted" };
-  } catch (err: any) {
-    return {
-      success: false,
-      message: "Could not connect to Apple Health for vitals. This requires a native iOS build.",
-    };
-  }
-}
-
 export async function saveVitalToHealthKit(reading: {
   type: "SpO2" | "BloodPressure" | "TempOral" | "TempForehead";
   value: number | { systolic: number; diastolic: number };
