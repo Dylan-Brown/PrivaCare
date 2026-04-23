@@ -27,7 +27,7 @@ const CARDS: Card[] = [
     icon: "heart",
     iconColor: "#34C78B",
     title: "Welcome to PrivaCare",
-    body: "Your personal health companion — private, simple, and always on your device.",
+    body: "PrivaCare makes it effortless to track your medications, skincare routine, and vital signs — all in one place. Everything stays private on your device. No accounts, no cloud, no complexity.",
   },
   {
     icon: "today-outline",
@@ -79,12 +79,12 @@ export function WelcomeModal({ visible, onDone }: Props) {
       onDone();
     } else {
       const next = currentIndex + 1;
-      listRef.current?.scrollToIndex({ index: next, animated: true });
+      listRef.current?.scrollToOffset({ offset: next * SCREEN_WIDTH, animated: true });
       setCurrentIndex(next);
     }
   };
 
-  const handleScroll = (e: any) => {
+  const handleScrollEnd = (e: any) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setCurrentIndex(idx);
   };
@@ -109,7 +109,13 @@ export function WelcomeModal({ visible, onDone }: Props) {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleScroll}
+            onMomentumScrollEnd={handleScrollEnd}
+            onScrollEndDrag={handleScrollEnd}
+            getItemLayout={(_, index) => ({
+              length: SCREEN_WIDTH,
+              offset: SCREEN_WIDTH * index,
+              index,
+            })}
             keyExtractor={(_, i) => String(i)}
             style={styles.list}
             renderItem={({ item }) => (
