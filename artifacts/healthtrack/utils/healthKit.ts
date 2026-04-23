@@ -68,7 +68,14 @@ export async function requestHealthKitPermissions(): Promise<{
     }
 
     await HK.requestAuthorization({
-      toShare: ["HKCategoryTypeIdentifierMedicationDoseEvent"],
+      toShare: [
+        "HKCategoryTypeIdentifierMedicationDoseEvent",
+        "HKQuantityTypeIdentifierOxygenSaturation",
+        "HKQuantityTypeIdentifierBodyTemperature",
+        "HKCorrelationTypeIdentifierBloodPressure",
+        "HKQuantityTypeIdentifierBloodPressureSystolic",
+        "HKQuantityTypeIdentifierBloodPressureDiastolic",
+      ],
       toRead: [],
     });
 
@@ -132,6 +139,7 @@ export async function requestVitalsHealthKitPermissions(): Promise<{
 export async function saveVitalToHealthKit(reading: {
   type: "SpO2" | "BloodPressure" | "TempOral" | "TempForehead";
   value: number | { systolic: number; diastolic: number };
+  unit: string;
   timestamp: string;
 }): Promise<void> {
   const enabled = await getHealthKitSyncEnabled();
@@ -155,9 +163,11 @@ export async function saveVitalToHealthKit(reading: {
       (reading.type === "TempOral" || reading.type === "TempForehead") &&
       typeof reading.value === "number"
     ) {
+      const isCelsius = reading.unit.includes("C");
+      const hkTempUnit = isCelsius ? "HKUnit.degreeCelsius" : "HKUnit.degreeFahrenheit";
       await HK.saveQuantitySample(
         "HKQuantityTypeIdentifierBodyTemperature",
-        "HKUnit.degreeFahrenheit",
+        hkTempUnit,
         reading.value,
         at,
         at,

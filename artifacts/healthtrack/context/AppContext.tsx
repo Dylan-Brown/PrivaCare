@@ -381,6 +381,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     saveVitalToHealthKit({
       type: r.type,
       value: r.value,
+      unit: r.unit,
       timestamp: r.timestamp,
     }).catch(() => {});
   }, []);

@@ -385,11 +385,11 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.rowText}>
                 <Text style={[styles.rowTitle, { color: colors.text }]}>Sync to Apple Health</Text>
-                <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+                <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={3}>
                   {hkEnabled
-                    ? "Dose events are written to Apple Health when you log a medication"
+                    ? "Medication doses, SpO₂, blood pressure, and temperature are synced to Apple Health"
                     : hkAvailable
-                    ? "Log dose events to your Apple Health timeline when you take a medication"
+                    ? "Sync medication doses and vital signs (SpO₂, blood pressure, temperature) to Apple Health"
                     : "Requires a native iOS build — not available in the Expo preview"}
                 </Text>
               </View>
@@ -414,10 +414,8 @@ export default function SettingsScreen() {
             <View style={[styles.hkInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="information-circle-outline" size={15} color={colors.textSecondary} />
               <Text style={[styles.hkInfoText, { color: colors.textSecondary }]}>
-                When you log a medication in PrivaCare, a{" "}
-                <Text style={{ fontFamily: "Inter_600SemiBold" }}>Medication Dose Event</Text> is written to
-                Apple Health. Your dose history will appear in the Health app under{" "}
-                <Text style={{ fontFamily: "Inter_600SemiBold" }}>Browse → Other Data → Medications</Text>.
+                When you log a medication, a{" "}
+                <Text style={{ fontFamily: "Inter_600SemiBold" }}>Medication Dose Event</Text> is written to Apple Health. Vital sign readings (SpO₂, blood pressure, temperature) are also written when you save them.
               </Text>
             </View>
           )}
