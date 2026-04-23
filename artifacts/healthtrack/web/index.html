@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>PrivaCare – Private Health Tracker</title>
+    <meta name="description" content="Private health tracking for medications, skincare, and vital signs. All data stays on your device." />
+    <meta name="theme-color" content="#34C78B" />
+    <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon.ico" />
+    <script>
+      // GitHub Pages SPA redirect receiver
+      // Companion to public/404.html — restores the URL from the ?p= param set by 404.html
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        var p = params.get('p');
+        if (p) {
+          var h = params.get('h') || '';
+          params.delete('p');
+          params.delete('h');
+          var qs = params.toString();
+          var url = '/' + decodeURIComponent(p) + (qs ? '?' + qs : '') + (h ? '#' + decodeURIComponent(h) : '');
+          window.history.replaceState(null, null, url);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
