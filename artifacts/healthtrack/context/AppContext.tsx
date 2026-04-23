@@ -137,6 +137,74 @@ export type AppNotification = {
 
 export type VitalType = "SpO2" | "BloodPressure" | "TempOral" | "TempForehead";
 
+// ─── Streak ────────────────────────────────────────────────────────────────
+
+export type StreakData = {
+  count: number;
+  lastCompletedDate: string;       // "YYYY-MM-DD" of the last day counted into the streak
+  celebratedMilestones: number[];  // streak counts whose popup has already been shown
+};
+
+const DEFAULT_STREAK: StreakData = { count: 0, lastCompletedDate: "", celebratedMilestones: [] };
+
+/** Returns true when every scheduled entry for that day has been logged. */
+function isDayComplete(log: DayLog | undefined): boolean {
+  if (!log || log.entries.length === 0) return false;
+  return log.entries.every(e => e.isComplete);
+}
+
+/** Returns the "YYYY-MM-DD" string for N days before a given date string. */
+function offsetDateString(dateStr: string, offsetDays: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() - offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Returns the total number of days in the past N calendar months ending on refDate. */
+function daysInLastNMonths(refDate: Date, n: number): number {
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const y = refDate.getFullYear();
+    const m = refDate.getMonth() - i;     // may be negative — Date handles it
+    total += new Date(y, m, 0).getDate(); // day 0 of month = last day of prev month
+  }
+  return total;
+}
+
+/** Returns whether a given year is a leap year. */
+function isLeapYear(y: number): boolean {
+  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+}
+
+/**
+ * Computes the milestone streak counts to celebrate, ordered ascending.
+ * Fixed: 1, 7, 14.
+ * Calendar-relative (calculated from today): 1 month, 2 months, 6 months, 1 year.
+ * Then every additional year from year 1.
+ */
+export function computeStreakMilestones(refDate: Date): number[] {
+  const milestones = new Set<number>([1, 7, 14]);
+
+  const oneMonth = daysInLastNMonths(refDate, 1);
+  const twoMonths = daysInLastNMonths(refDate, 2);
+  const sixMonths = daysInLastNMonths(refDate, 6);
+  milestones.add(oneMonth);
+  milestones.add(twoMonths);
+  milestones.add(sixMonths);
+
+  const oneYear = isLeapYear(refDate.getFullYear()) ? 366 : 365;
+  milestones.add(oneYear);
+
+  // Additional years: accumulate actual days per calendar year
+  let accumDays = oneYear;
+  for (let y = 1; y <= 9; y++) {
+    accumDays += isLeapYear(refDate.getFullYear() + y) ? 366 : 365;
+    milestones.add(accumDays);
+  }
+
+  return Array.from(milestones).sort((a, b) => a - b);
+}
+
 export type VitalReading = {
   id: string;
   type: VitalType;
@@ -203,6 +271,14 @@ type AppContextType = {
   userProfile: UserProfile;
   setUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 
+  streak: StreakData;
+  /**
+   * Re-evaluates the streak against the current dayLogs.
+   * Returns the milestone count to celebrate (if any), or null.
+   * Call this on app focus / after completing a group.
+   */
+  checkAndUpdateStreak: () => Promise<number | null>;
+
   vitalReadings: VitalReading[];
   addVitalReading: (r: Omit<VitalReading, "id">) => Promise<void>;
   deleteVitalReading: (id: string) => Promise<void>;
@@ -266,13 +342,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [vitalReadings, setVitalReadings] = useState<VitalReading[]>([]);
   const [tempUnit, setTempUnitState] = useState<"F" | "C">("F");
+  const [streak, setStreak] = useState<StreakData>(DEFAULT_STREAK);
 
   // ─── Load all data on mount ────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
         const [meds, groups, medLogs, products, routines, skinLogs,
-               profileRaw, dayLogsRaw, notifsRaw, vitalsRaw, tempUnitRaw] = await Promise.all([
+               profileRaw, dayLogsRaw, notifsRaw, vitalsRaw, tempUnitRaw, streakRaw] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.MEDICATIONS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_GROUPS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_LOGS),
@@ -284,6 +361,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
           AsyncStorage.getItem(STORAGE_KEYS.VITAL_READINGS),
           AsyncStorage.getItem(STORAGE_KEYS.TEMP_UNIT),
+          AsyncStorage.getItem(STORAGE_KEYS.STREAK),
         ]);
         if (meds) setMedications((JSON.parse(meds) as any[]).map(migrateMedication));
         if (groups) setMedicationGroups(JSON.parse(groups));
@@ -296,6 +374,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (notifsRaw) setNotifications(JSON.parse(notifsRaw));
         if (vitalsRaw) setVitalReadings(JSON.parse(vitalsRaw));
         if (tempUnitRaw === "F" || tempUnitRaw === "C") setTempUnitState(tempUnitRaw);
+        if (streakRaw) setStreak({ ...DEFAULT_STREAK, ...JSON.parse(streakRaw) });
       } catch (e) {
         console.error("Error loading data", e);
       } finally {
@@ -371,6 +450,78 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   async function setTempUnit(u: "F" | "C") {
     setTempUnitState(u);
     await AsyncStorage.setItem(STORAGE_KEYS.TEMP_UNIT, u);
+  }
+
+  // ─── Streak ────────────────────────────────────────────────────────────────
+
+  /**
+   * Reads the latest streak data from storage (to avoid stale closure), re-evaluates
+   * the streak based on dayLogs, persists the result, and returns the milestone value
+   * to celebrate if a new milestone was just crossed, otherwise null.
+   */
+  async function checkAndUpdateStreak(): Promise<number | null> {
+    const today = todayString();
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.STREAK);
+    const current: StreakData = raw ? { ...DEFAULT_STREAK, ...JSON.parse(raw) } : DEFAULT_STREAK;
+
+    // Walk backwards from today through dayLogs to compute the current streak.
+    // Days with no entries are transparent (neither count nor break the streak).
+    // We stop when we hit a day with entries that are not all complete.
+    let newCount = 0;
+    let newLastCompleted = "";
+    let offset = 0;
+    const MAX_DAYS_BACK = 400;
+
+    while (offset <= MAX_DAYS_BACK) {
+      const dateStr = offsetDateString(today, offset);
+      const log = dayLogs[dateStr];
+
+      if (!log || log.entries.length === 0) {
+        // No scheduled items — transparent day.
+        // If we haven't found any completed day yet (still looking at today/recent), continue.
+        // But if we already passed the most recent completed day, stop.
+        if (newCount > 0) break;
+        offset++;
+        continue;
+      }
+
+      if (isDayComplete(log)) {
+        newCount++;
+        if (newLastCompleted === "") newLastCompleted = dateStr;
+        offset++;
+      } else {
+        // This day had entries but wasn't complete — streak breaks here.
+        // Exception: if this is today and it's still in progress, don't break the streak —
+        // just don't count today.
+        if (offset === 0) {
+          // Today is incomplete — that's fine, just skip today and keep scanning yesterday.
+          offset++;
+          continue;
+        }
+        break;
+      }
+    }
+
+    // Detect if a new milestone should be celebrated.
+    const milestones = computeStreakMilestones(new Date());
+    const uncelebrated = milestones.filter(
+      m => m <= newCount && !current.celebratedMilestones.includes(m)
+    );
+    // Show only the highest uncelebrated milestone this check (the most impressive one).
+    const pendingMilestone = uncelebrated.length > 0 ? Math.max(...uncelebrated) : null;
+
+    const updated: StreakData = {
+      count: newCount,
+      lastCompletedDate: newLastCompleted,
+      celebratedMilestones: pendingMilestone
+        ? [...current.celebratedMilestones, ...uncelebrated]
+        : current.celebratedMilestones,
+    };
+
+    setStreak(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.STREAK, JSON.stringify(updated));
+
+    return pendingMilestone;
   }
 
   // ─── Medications ──────────────────────────────────────────────────────────
@@ -897,6 +1048,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deleteNotification,
     userProfile,
     setUserProfile,
+    streak,
+    checkAndUpdateStreak,
     vitalReadings,
     addVitalReading,
     deleteVitalReading,

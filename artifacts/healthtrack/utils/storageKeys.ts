@@ -12,4 +12,5 @@ export const STORAGE_KEYS = {
   INSIGHTS_MONTHLY: "@vital_insights_last_monthly",
   VITAL_READINGS: "@privacre_vital_readings",
   TEMP_UNIT: "@privacre_temp_unit",
+  STREAK: "@privacre_streak",
 };
