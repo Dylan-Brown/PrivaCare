@@ -189,6 +189,7 @@ function MetricSection({
   range,
   tempUnit,
   onDelete,
+  onLogFirst,
   colors,
 }: {
   metric: MetricDef;
@@ -196,6 +197,7 @@ function MetricSection({
   range: RangeKey;
   tempUnit: "F" | "C";
   onDelete: (id: string) => void;
+  onLogFirst: () => void;
   colors: any;
 }) {
   const isTemp = metric.type === "TempOral" || metric.type === "TempForehead";
@@ -206,32 +208,37 @@ function MetricSection({
 
   const latest = readings[0];
 
+  const chronologicalReadings = useMemo(
+    () => [...readings].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+    [readings]
+  );
+
   const scalarData = useMemo(() => {
     if (metric.isBP) return null;
-    return readings.filter(isScalarReading).map(r => ({
+    return chronologicalReadings.filter(isScalarReading).map(r => ({
       value: r.value,
       label: formatXLabel(r.timestamp, range),
       timestamp: r.timestamp,
     }));
-  }, [readings, range, metric.isBP]);
+  }, [chronologicalReadings, range, metric.isBP]);
 
   const systolicData = useMemo(() => {
     if (!metric.isBP) return null;
-    return readings.filter(isBPReading).map(r => ({
+    return chronologicalReadings.filter(isBPReading).map(r => ({
       value: r.value.systolic,
       label: formatXLabel(r.timestamp, range),
       timestamp: r.timestamp,
     }));
-  }, [readings, range, metric.isBP]);
+  }, [chronologicalReadings, range, metric.isBP]);
 
   const diastolicData = useMemo(() => {
     if (!metric.isBP) return null;
-    return readings.filter(isBPReading).map(r => ({
+    return chronologicalReadings.filter(isBPReading).map(r => ({
       value: r.value.diastolic,
       label: formatXLabel(r.timestamp, range),
       timestamp: r.timestamp,
     }));
-  }, [readings, range, metric.isBP]);
+  }, [chronologicalReadings, range, metric.isBP]);
 
   return (
     <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -258,7 +265,15 @@ function MetricSection({
 
       {readings.length === 0 ? (
         <View style={styles.emptyChart}>
+          <Ionicons name="bar-chart-outline" size={28} color={colors.textTertiary} />
           <Text style={[styles.emptyChartText, { color: colors.textTertiary }]}>No readings in this period</Text>
+          <Pressable
+            onPress={onLogFirst}
+            style={({ pressed }) => [styles.logFirstBtn, { backgroundColor: `${metric.color}18`, opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="add-circle-outline" size={14} color={metric.color} />
+            <Text style={[styles.logFirstBtnText, { color: metric.color }]}>Log first reading</Text>
+          </Pressable>
         </View>
       ) : metric.isBP ? (
         <>
@@ -474,6 +489,7 @@ export default function VitalsHistoryScreen() {
             range={range}
             tempUnit={tempUnit}
             onDelete={handleDelete}
+            onLogFirst={() => router.push("/vitals-log")}
             colors={colors}
           />
         ))}
@@ -540,11 +556,22 @@ const styles = StyleSheet.create({
   normalBadgeText: { fontSize: 11, fontFamily: "Inter_500Medium" },
 
   emptyChart: {
-    height: 80,
+    paddingVertical: 24,
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
   },
   emptyChartText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  logFirstBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  logFirstBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
   bpChartLabel: { fontSize: 12, fontFamily: "Inter_500Medium", marginBottom: -8 },
 
