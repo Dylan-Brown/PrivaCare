@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CompoundIngredient, Medication, MedicationCategory, ItemSchedule, useApp } from "@/context/AppContext";
@@ -43,19 +42,6 @@ const DEFAULT_INGREDIENTS: CompoundIngredient[] = [
   { name: "", amount: "", unit: "mg" },
 ];
 
-const DISCLAIMER_TEXT =
-  "Only take, use, and schedule your medication as directed by your healthcare provider. "
-  + "Do not adjust your dosage or schedule without first consulting a qualified medical professional. "
-  + "PrivaCare is a personal tracking tool and is not a substitute for medical advice.";
-
-const DISCLOSURE_TEXT =
-  "PrivaCare can check for potential drug interactions using the NIH RxNorm API — a free public service "
-  + "maintained by the U.S. National Library of Medicine.\n\n"
-  + "Important: While your other health data stays entirely on this device, your medication names "
-  + "are sent to a third-party server during an interaction check. No personal information is "
-  + "included, but your medication names will leave this device.\n\n"
-  + "Would you like to enable drug interaction checking?";
-
 type ScheduleType = "asNeeded" | "scheduled" | null;
 type FreqKey = "daily" | "every-other-day" | "weekly" | "custom";
 
@@ -67,7 +53,7 @@ type Props = {
 
 export function AddMedicationModal({ visible, onClose, editMed }: Props) {
   const { colors } = useTheme();
-  const { addMedication, updateMedication, medications, skincareProducts, userProfile } = useApp();
+  const { addMedication, updateMedication, userProfile } = useApp();
   const insets = useSafeAreaInsets();
 
   // ── Core fields ────────────────────────────────────────────────────────
@@ -75,10 +61,11 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
   const [brandName, setBrandName] = useState("");
   const [dosage, setDosage]       = useState("");
   const [unit, setUnit]           = useState("mg");
+  const [trackSupply, setTrackSupply] = useState(false);
   const [bottleCount, setBottleCount] = useState("30");
   const [remaining, setRemaining] = useState("30");
   const [lowThreshold, setLowThreshold] = useState("10");
-  const [notifyLow, setNotifyLow] = useState(true);
+  const [notifyLow, setNotifyLow] = useState(false);
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
   const [selectedIcon, setSelectedIcon]   = useState("mci:pill");
   const [showIconPicker, setShowIconPicker] = useState(false);
@@ -104,7 +91,9 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
       setBrandName(editMed.brandName ?? "");
       setDosage(editMed.dosage);
       setUnit(editMed.unit);
-      setBottleCount((editMed.bottleCount ?? editMed.totalCount ?? 30).toString());
+      const bc = editMed.bottleCount ?? editMed.totalCount ?? 0;
+      setTrackSupply(bc > 0);
+      setBottleCount(bc > 0 ? bc.toString() : "30");
       setRemaining(editMed.remainingCount.toString());
       setLowThreshold(editMed.lowStockThreshold.toString());
       setNotifyLow(editMed.notifyLowStock);
@@ -125,8 +114,9 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
       }
     } else {
       setName(""); setBrandName(""); setDosage(""); setUnit("mg");
+      setTrackSupply(false);
       setBottleCount("30"); setRemaining("30");
-      setLowThreshold("10"); setNotifyLow(true);
+      setLowThreshold("10"); setNotifyLow(false);
       setSelectedColor(COLORS[0]); setSelectedIcon("mci:pill"); setCategory(undefined);
       setIsCompound(false); setIngredients(DEFAULT_INGREDIENTS);
       setScheduleType(null); setFrequency("daily"); setCustomDays("3"); setTimes(["08:00"]);
@@ -195,14 +185,14 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
   };
 
   const doActualSave = async () => {
-    const bottle    = Math.max(1, parseInt(bottleCount) || 30);
-    const rem       = Math.max(0, parseInt(remaining) || 0);
-    const threshold = parseInt(lowThreshold) || 10;
+    const bottle    = trackSupply ? Math.max(1, parseInt(bottleCount) || 30) : 0;
+    const rem       = trackSupply ? Math.max(0, parseInt(remaining) || 0) : 0;
+    const threshold = trackSupply ? (parseInt(lowThreshold) || 10) : 0;
     const cleanIngredients = isCompound
       ? ingredients.filter(ing => ing.name.trim() || ing.amount.trim())
       : [];
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
 
     const schedule = buildSchedule();
 
@@ -211,7 +201,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         name: name.trim(), brandName: brandName.trim() || undefined,
         dosage: dosage.trim(), unit,
         bottleCount: bottle, totalCount: bottle, remainingCount: rem,
-        lowStockThreshold: threshold, notifyLowStock: notifyLow,
+        lowStockThreshold: threshold, notifyLowStock: trackSupply && notifyLow,
         color: selectedColor, icon: selectedIcon, category,
         isCompound, ingredients: cleanIngredients,
         schedule, notes: notes.trim() || undefined,
@@ -221,7 +211,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
         name: name.trim(), brandName: brandName.trim() || undefined,
         dosage: dosage.trim(), unit,
         bottleCount: bottle, totalCount: bottle, remainingCount: rem,
-        lowStockThreshold: threshold, notifyLowStock: notifyLow,
+        lowStockThreshold: threshold, notifyLowStock: trackSupply && notifyLow,
         color: selectedColor, icon: selectedIcon,
         status: "active", awaitingRefill: false, category,
         isCompound, ingredients: cleanIngredients,
@@ -231,32 +221,13 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
     onClose();
   };
 
-  const afterDisclaimer = async () => {
-    const disclosureShown = await AsyncStorage.getItem("@vital_interaction_disclosure_shown");
-    const totalItems = medications.length + skincareProducts.length;
-    if (!disclosureShown && totalItems >= 1) {
-      Alert.alert("Drug Interaction Checking", DISCLOSURE_TEXT, [
-        { text: "Skip", onPress: async () => {
-          await AsyncStorage.setItem("@vital_interaction_disclosure_shown", "true");
-          doActualSave();
-        }},
-        { text: "Enable", style: "default", onPress: async () => {
-          await AsyncStorage.setItem("@vital_interaction_disclosure_shown", "true");
-          doActualSave();
-        }},
-      ]);
-    } else {
-      doActualSave();
-    }
-  };
-
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert("Required", "Please enter a medication name.");
       return;
     }
     if (!scheduleType) {
-      Alert.alert("Required", "Please select whether this medication is as needed or on a schedule.");
+      Alert.alert("Required", "Please select a usage schedule.");
       return;
     }
     if (scheduleType === "scheduled" && times.length === 0) {
@@ -267,24 +238,7 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
       Alert.alert("Required", "Please enter at least one ingredient name.");
       return;
     }
-
-    if (editMed) {
-      doActualSave();
-      return;
-    }
-
-    const disclaimerDate = await AsyncStorage.getItem("@vital_disclaimer_date");
-    if (disclaimerDate !== todayString()) {
-      Alert.alert("Medical Disclaimer", DISCLAIMER_TEXT, [
-        { text: "Cancel", style: "cancel" },
-        { text: "I Understand", onPress: async () => {
-          await AsyncStorage.setItem("@vital_disclaimer_date", todayString());
-          afterDisclaimer();
-        }},
-      ]);
-    } else {
-      afterDisclaimer();
-    }
+    doActualSave();
   };
 
   const canSave = Boolean(name.trim() && scheduleType);
@@ -589,46 +543,58 @@ export function AddMedicationModal({ visible, onClose, editMed }: Props) {
             )}
           </View>
 
-          {/* Pill Count */}
+          {/* Supply Tracking */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>BOTTLE SIZE</Text>
-            <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>How many pills/doses came in the bottle</Text>
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. 90"
-              placeholderTextColor={colors.textTertiary}
-              value={bottleCount}
-              onChangeText={syncRemaining}
-              keyboardType="number-pad"
-            />
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>REMAINING NOW</Text>
-            <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>How many you currently have left</Text>
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. 45"
-              placeholderTextColor={colors.textTertiary}
-              value={remaining}
-              onChangeText={setRemaining}
-              keyboardType="number-pad"
-            />
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.switchRow}>
               <View style={styles.switchInfo}>
-                <Text style={[styles.switchLabel, { color: colors.text }]}>Low stock alert</Text>
-                <Text style={[styles.switchSub, { color: colors.textSecondary }]}>Alert when fewer than {lowThreshold || "?"} remain</Text>
+                <Text style={[styles.switchLabel, { color: colors.text }]}>Track Supply</Text>
+                <Text style={[styles.switchSub, { color: colors.textSecondary }]}>Monitor bottle count and get low-stock alerts</Text>
               </View>
-              <Switch value={notifyLow} onValueChange={setNotifyLow} trackColor={{ false: colors.border, true: selectedColor }} thumbColor="#fff" ios_backgroundColor={colors.border} />
+              <Switch value={trackSupply} onValueChange={v => { try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {} setTrackSupply(v); }} trackColor={{ false: colors.border, true: selectedColor }} thumbColor="#fff" ios_backgroundColor={colors.border} />
             </View>
-            {notifyLow && (
-              <TextInput
-                style={[styles.input, { color: colors.text, marginTop: 10 }]}
-                placeholder="Alert threshold (e.g. 10)"
-                placeholderTextColor={colors.textTertiary}
-                value={lowThreshold}
-                onChangeText={setLowThreshold}
-                keyboardType="number-pad"
-              />
+            {trackSupply && (
+              <>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>BOTTLE SIZE</Text>
+                <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>How many pills/doses came in the bottle</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="e.g. 90"
+                  placeholderTextColor={colors.textTertiary}
+                  value={bottleCount}
+                  onChangeText={syncRemaining}
+                  keyboardType="number-pad"
+                />
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>REMAINING NOW</Text>
+                <Text style={[styles.fieldHint, { color: colors.textTertiary }]}>How many you currently have left</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="e.g. 45"
+                  placeholderTextColor={colors.textTertiary}
+                  value={remaining}
+                  onChangeText={setRemaining}
+                  keyboardType="number-pad"
+                />
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <View style={styles.switchRow}>
+                  <View style={styles.switchInfo}>
+                    <Text style={[styles.switchLabel, { color: colors.text }]}>Low stock alert</Text>
+                    <Text style={[styles.switchSub, { color: colors.textSecondary }]}>Alert when fewer than {lowThreshold || "?"} remain</Text>
+                  </View>
+                  <Switch value={notifyLow} onValueChange={setNotifyLow} trackColor={{ false: colors.border, true: selectedColor }} thumbColor="#fff" ios_backgroundColor={colors.border} />
+                </View>
+                {notifyLow && (
+                  <TextInput
+                    style={[styles.input, { color: colors.text, marginTop: 10 }]}
+                    placeholder="Alert threshold (e.g. 10)"
+                    placeholderTextColor={colors.textTertiary}
+                    value={lowThreshold}
+                    onChangeText={setLowThreshold}
+                    keyboardType="number-pad"
+                  />
+                )}
+              </>
             )}
           </View>
 

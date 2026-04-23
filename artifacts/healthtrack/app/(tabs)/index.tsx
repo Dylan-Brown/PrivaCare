@@ -409,7 +409,7 @@ export default function TodayScreen() {
           <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
         </Pressable>
 
-        <View style={[styles.logReactionsBtn, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, padding: 0 }]}>
+        <View style={[styles.logReactionsBtn, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", alignItems: "stretch", gap: 0, padding: 0 }]}>
           <Pressable
             style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14 }}
             onPress={() => router.push("/vitals-log")}

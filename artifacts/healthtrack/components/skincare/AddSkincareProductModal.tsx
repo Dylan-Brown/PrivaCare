@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ItemSchedule, SkincareProduct, useApp } from "@/context/AppContext";
@@ -36,19 +35,6 @@ const FREQ_OPTIONS = [
 ] as const;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-const DISCLAIMER_TEXT =
-  "Only take, use, and schedule your skincare products as directed by the manufacturer or your "
-  + "healthcare provider. Do not use products to which you have known allergies. "
-  + "PrivaCare is a personal tracking tool and is not a substitute for professional advice.";
-
-const DISCLOSURE_TEXT =
-  "PrivaCare can check for potential drug interactions using the NIH RxNorm API — a free public service "
-  + "maintained by the U.S. National Library of Medicine.\n\n"
-  + "Important: While your other health data stays entirely on this device, your medication names "
-  + "are sent to a third-party server during an interaction check. No personal information is "
-  + "included, but medication names will leave this device.\n\n"
-  + "Would you like to enable drug interaction checking?";
 
 type ScheduleType = "asNeeded" | "scheduled" | null;
 type FreqKey = "daily" | "every-other-day" | "weekly" | "custom";
@@ -74,7 +60,7 @@ function buildExpiryDate(month: number, year: number): string {
 
 export function AddSkincareProductModal({ visible, onClose, editProduct }: Props) {
   const { colors } = useTheme();
-  const { addSkincareProduct, updateSkincareProduct, medications, skincareProducts } = useApp();
+  const { addSkincareProduct, updateSkincareProduct } = useApp();
   const insets = useSafeAreaInsets();
 
   // ── Core fields ────────────────────────────────────────────────────────
@@ -169,7 +155,7 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
     const schedule = buildSchedule();
     const expiryDate = hasExpiry ? buildExpiryDate(expiryMonth, expiryYear) : undefined;
     const notesVal = notes.trim() || undefined;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     if (editProduct) {
       await updateSkincareProduct(editProduct.id, {
         name: name.trim(), brand: brand.trim(), type,
@@ -186,47 +172,16 @@ export function AddSkincareProductModal({ visible, onClose, editProduct }: Props
     onClose();
   };
 
-  const afterDisclaimer = async () => {
-    const disclosureShown = await AsyncStorage.getItem("@vital_interaction_disclosure_shown");
-    const totalItems = medications.length + skincareProducts.length;
-    if (!disclosureShown && totalItems >= 1) {
-      Alert.alert("Drug Interaction Checking", DISCLOSURE_TEXT, [
-        { text: "Skip", onPress: async () => {
-          await AsyncStorage.setItem("@vital_interaction_disclosure_shown", "true");
-          doActualSave();
-        }},
-        { text: "Enable", style: "default", onPress: async () => {
-          await AsyncStorage.setItem("@vital_interaction_disclosure_shown", "true");
-          doActualSave();
-        }},
-      ]);
-    } else {
-      doActualSave();
-    }
-  };
-
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert("Required", "Please enter a product name.");
       return;
     }
     if (!scheduleType) {
-      Alert.alert("Required", "Please select whether this product is as needed or on a schedule.");
+      Alert.alert("Required", "Please select a usage schedule.");
       return;
     }
-    if (editProduct) { doActualSave(); return; }
-    const disclaimerDate = await AsyncStorage.getItem("@vital_disclaimer_date");
-    if (disclaimerDate !== todayString()) {
-      Alert.alert("Usage Reminder", DISCLAIMER_TEXT, [
-        { text: "Cancel", style: "cancel" },
-        { text: "I Understand", onPress: async () => {
-          await AsyncStorage.setItem("@vital_disclaimer_date", todayString());
-          afterDisclaimer();
-        }},
-      ]);
-    } else {
-      afterDisclaimer();
-    }
+    doActualSave();
   };
 
   const canSave = Boolean(name.trim() && scheduleType);

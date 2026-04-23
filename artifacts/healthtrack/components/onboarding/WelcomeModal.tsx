@@ -73,6 +73,13 @@ export function WelcomeModal({ visible, onDone }: Props) {
   const listRef = useRef<FlatList<Card>>(null);
   const isLast = currentIndex === CARDS.length - 1;
 
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      setCurrentIndex(viewableItems[0].index);
+    }
+  });
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
+
   const goNext = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isLast) {
@@ -82,11 +89,6 @@ export function WelcomeModal({ visible, onDone }: Props) {
       listRef.current?.scrollToOffset({ offset: next * SCREEN_WIDTH, animated: true });
       setCurrentIndex(next);
     }
-  };
-
-  const handleScrollEnd = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-    setCurrentIndex(idx);
   };
 
   return (
@@ -109,8 +111,8 @@ export function WelcomeModal({ visible, onDone }: Props) {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleScrollEnd}
-            onScrollEndDrag={handleScrollEnd}
+            onViewableItemsChanged={onViewableItemsChanged.current}
+            viewabilityConfig={viewabilityConfig.current}
             getItemLayout={(_, index) => ({
               length: SCREEN_WIDTH,
               offset: SCREEN_WIDTH * index,

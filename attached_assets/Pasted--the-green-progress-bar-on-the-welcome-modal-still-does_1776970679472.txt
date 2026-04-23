@@ -1,0 +1,13 @@
+- the green progress bar on the welcome modal still does not move when swiping left or right on the welcome modal
+- The calendar page shows “log vital signs” and “view vitals history” as misaligned. Make them horizontally aligned such that they both fit and look correct in the box around them
+- For the other substances text box, when a user presses comma or enter on that box, instead of leaving the text in the box, Move it (with text corrected or standardized) into its own green text box below the text box (green if recognized, red with a question mark if it is not), as to represent the item is now entered into the system. Also, for visual learners, have a plus sign button to the right of the text box as to add a bit of text / substance as a green/red box. In both potential routes to add a substance, the text box itself should be cleared when the green/red box appears. Green/red boxes should stack left to right until the line overflows and it moves the next item into the next line
+- The dark mode doesn’t change the color of the persistent top bar / bottom tabs bar and appears too bright during night view
+- On the add medications page, the bottle size/remaining now/low stock alert should be toggleable as to disable and enable (default: disabled) tracking these three metrix, and conversely, later on editing a medication it should be able to be enabled/disabled as well. Disabling the existing tracking when there is user data entered should simply pause tracking these metric until turned back on
+- The oval medication icon is in fact a rectangle 
+- The injection medication icon should switch places with the generic ‘’medical icon”, and the medical icon should be replaced by a new circular pill shape
+- The bottle medication icon looks more like a tonic than a pill bottle. Replace “patch” with “dropper” with a liquid dropper icon. 
+- The health and supplements box of icons’ entire second row ( “eye”, “fitness”, and cardiac”) can be deleted, but replace “Heart”’s icon with fitnesses’s icon 
+- The confirm button on add medications page doesn’t work. Same for the skincare product page. I have been unable to test groups. 
+- When there is no data and I try to export Health Report, there is an error message
+- In the settings page, we can group Export Health Report into the Backup & Restore group. Rename groupings as necessary . Also the compound medication group should be underneath the substances group 
+- The temperature units should only change what is visible on the front end; all health data saved should note the original measurement’s status as either Farenheit or Celcius and convert on the front end where appropriate 
