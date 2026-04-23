@@ -24,11 +24,15 @@ import { toDateString, todayString, formatNavDate } from "@/utils/scheduleComput
 // ─── Layout constants ────────────────────────────────────────────────────────
 
 const CENTER_SIZE     = 130;
-const STEP            = 96;  // px between adjacent tile centers — slight overlap for depth
 const TILE_POSITIONS  = [-3, -2, -1, 0, 1, 2, 3] as const;
 
 const SIZE_AT_DIST    = [130, 94, 68, 46];   // tile size at distance 0,1,2,3
 const OPACITY_AT_DIST = [1.0, 0.72, 0.46, 0.0];
+
+// Non-uniform x-offsets: wider gap between center and ±1, tighter between ±1 and ±2+
+// visualPos → translateX mapping (symmetric)
+const TX_MAP_POS = [-3, -2, -1,    0,  1,   2,   3] as const;
+const TX_MAP_VAL = [-304, -204, -112, 0, 112, 204, 304] as const;
 
 const MED_COLOR  = "#34C78B";
 const SKIN_COLOR = "#FF6CBF";
@@ -173,7 +177,8 @@ function AnimatedTileSlot({
     const absDist   = Math.abs(visualPos);
     const size      = interpolate(absDist, [0, 1, 2, 3], SIZE_AT_DIST, "clamp");
     const op        = interpolate(absDist, [0, 1, 2, 3], OPACITY_AT_DIST, "clamp");
-    const tx        = visualPos * STEP;
+    // Non-uniform spacing: wider gap between center and ±1
+    const tx        = interpolate(visualPos, TX_MAP_POS as unknown as number[], TX_MAP_VAL as unknown as number[], "clamp");
     const zIdx      = Math.round(20 - absDist * 4);
     // vertically centre within the fixed-height strip
     const top       = (CENTER_SIZE - size) / 2;
@@ -228,9 +233,9 @@ export function DayTileCarousel({
   const containerWidth     = screenWidth - 32;
   const containerHalfWidth = containerWidth / 2;
 
-  // Pre-build day logs for all visible dates whenever viewingDate changes
+  // Pre-build day logs for all 7 visible tile positions whenever viewingDate changes
   useEffect(() => {
-    for (let d = -2; d <= 2; d++) {
+    for (let d = -3; d <= 3; d++) {
       buildDayLog(offsetDate(viewingDate, d));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,24 +243,29 @@ export function DayTileCarousel({
 
   const animOffset = useSharedValue(0);
 
+  // Both the animOffset reset AND the date-change must happen together on the JS
+  // thread so React can batch them into the same render frame — eliminating the
+  // one-frame flash that occurred when the UI-thread reset fired before the
+  // JS-thread viewingDate update.
+  const commitNavigation = useCallback((newDate: string) => {
+    animOffset.value = 0;
+    onDateChange(newDate);
+  }, [animOffset, onDateChange]);
+
   const navigate = useCallback((direction: 1 | -1) => {
-    // direction: +1 = forward (next day), -1 = backward (prev day)
     if (direction === 1 && !canGoNext) return;
     if (animOffset.value !== 0) return;
-    // When going next (+1): tiles shift LEFT → animOffset → -1
-    // When going prev (-1): tiles shift RIGHT → animOffset → +1
+    // +1 (next day) → tiles shift LEFT → animOffset target = -1
+    // -1 (prev day) → tiles shift RIGHT → animOffset target = +1
     const target = -direction as -1 | 1;
     animOffset.value = withTiming(
       target,
       { duration: 340, easing: Easing.out(Easing.cubic) },
       finished => {
-        if (finished) {
-          runOnJS(onDateChange)(offsetDate(viewingDate, direction));
-          animOffset.value = 0;
-        }
+        if (finished) runOnJS(commitNavigation)(offsetDate(viewingDate, direction));
       }
     );
-  }, [viewingDate, canGoNext, onDateChange, animOffset]);
+  }, [viewingDate, canGoNext, commitNavigation, animOffset]);
 
   const hasMedLegend  = medicationGroups.length > 0 || medications.some(m => m.status === "active" && !m.schedule?.asNeeded);
   const hasSkinLegend = skincareRoutines.length > 0  || skincareProducts.some(p => !p.schedule?.asNeeded);
