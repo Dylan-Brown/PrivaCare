@@ -14,6 +14,8 @@ const STORAGE_KEYS = {
   DAY_LOGS: "@vital_day_logs",
   USER_PROFILE: "@vital_user_profile",
   NOTIFICATIONS: "@vital_notifications",
+  VITAL_READINGS: "@privacre_vital_readings",
+  TEMP_UNIT: "@privacre_temp_unit",
 };
 
 const APP_NAME = "PrivaCare";
@@ -31,10 +33,12 @@ export type BackupData = {
   dayLogs: unknown;
   userProfile: unknown;
   notifications: unknown;
+  vitalReadings?: unknown;
+  tempUnit?: string;
 };
 
 async function gatherBackupData(): Promise<BackupData> {
-  const [meds, groups, medLogs, products, routines, skinLogs, dayLogs, userProfile, notifications] =
+  const [meds, groups, medLogs, products, routines, skinLogs, dayLogs, userProfile, notifications, vitalsRaw, tempUnitRaw] =
     await Promise.all([
       AsyncStorage.getItem(STORAGE_KEYS.MEDICATIONS),
       AsyncStorage.getItem(STORAGE_KEYS.MED_GROUPS),
@@ -45,9 +49,11 @@ async function gatherBackupData(): Promise<BackupData> {
       AsyncStorage.getItem(STORAGE_KEYS.DAY_LOGS),
       AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE),
       AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
+      AsyncStorage.getItem(STORAGE_KEYS.VITAL_READINGS),
+      AsyncStorage.getItem(STORAGE_KEYS.TEMP_UNIT),
     ]);
   return {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     appName: APP_NAME,
     medications: meds ? JSON.parse(meds) : [],
@@ -59,6 +65,8 @@ async function gatherBackupData(): Promise<BackupData> {
     dayLogs: dayLogs ? JSON.parse(dayLogs) : {},
     userProfile: userProfile ? JSON.parse(userProfile) : null,
     notifications: notifications ? JSON.parse(notifications) : [],
+    vitalReadings: vitalsRaw ? JSON.parse(vitalsRaw) : [],
+    tempUnit: tempUnitRaw ?? "F",
   };
 }
 
@@ -187,6 +195,12 @@ export async function restoreBackup(data: BackupData): Promise<{ success: boolea
     }
     if (data.notifications !== undefined) {
       writes.push(AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(data.notifications)));
+    }
+    if (data.vitalReadings !== undefined) {
+      writes.push(AsyncStorage.setItem(STORAGE_KEYS.VITAL_READINGS, JSON.stringify(data.vitalReadings)));
+    }
+    if (data.tempUnit) {
+      writes.push(AsyncStorage.setItem(STORAGE_KEYS.TEMP_UNIT, data.tempUnit));
     }
     await Promise.all(writes);
     return { success: true, message: "Backup restored successfully" };

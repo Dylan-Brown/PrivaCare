@@ -111,6 +111,8 @@ function RootLayoutNav() {
         <Stack.Screen name="notifications" options={{ title: "Notifications", presentation: "modal" }} />
         <Stack.Screen name="skincare-reactions" options={{ title: "Skincare Reactions", presentation: "modal" }} />
         <Stack.Screen name="adherence" options={{ title: "How Am I Doing?", presentation: "modal" }} />
+        <Stack.Screen name="vitals-log" options={{ title: "Log Vitals", presentation: "modal" }} />
+        <Stack.Screen name="vitals-history" options={{ title: "Vital Signs History" }} />
       </Stack>
       <WelcomeModal visible={welcomeVisible} onDone={handleWelcomeDone} />
       <HealthKitOnboardingModal

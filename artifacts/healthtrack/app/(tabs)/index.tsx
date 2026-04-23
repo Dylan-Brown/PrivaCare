@@ -407,6 +407,18 @@ export default function TodayScreen() {
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
         </Pressable>
+
+        <Pressable
+          style={[styles.logReactionsBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push("/vitals-history")}
+        >
+          <Ionicons name="pulse-outline" size={20} color={colors.blue} />
+          <View style={styles.logReactionsBtnInfo}>
+            <Text style={[styles.logReactionsBtnTitle, { color: colors.text }]}>Track Vital Signs</Text>
+            <Text style={[styles.logReactionsBtnSub, { color: colors.textSecondary }]}>Blood oxygen, pressure, temperature</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </Pressable>
       </ScrollView>
 
       <GroupDetailModal
