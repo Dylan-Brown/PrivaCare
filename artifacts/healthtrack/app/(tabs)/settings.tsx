@@ -138,7 +138,7 @@ export default function SettingsScreen() {
   const { colors } = useTheme();
   const { colorSchemeOverride, setColorSchemeOverride } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs, dayLogs, userProfile, setUserProfile } = useApp();
+  const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs, dayLogs, userProfile, setUserProfile, tempUnit, setTempUnit } = useApp();
   const otherDrugsRef = useRef<TextInput>(null);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -298,7 +298,7 @@ export default function SettingsScreen() {
 
       <SectionHeader title="APPEARANCE" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.rowItem, styles.rowItemLast]}>
+        <View style={[styles.rowItem, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderLight }]}>
           <View style={[styles.rowIcon, { backgroundColor: `${colors.tint}20` }]}>
             <Ionicons name="moon-outline" size={18} color={colors.tint} />
           </View>
@@ -330,6 +330,43 @@ export default function SettingsScreen() {
                 >
                   <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: active ? "#fff" : colors.textSecondary }}>
                     {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        <View style={[styles.rowItem, styles.rowItemLast]}>
+          <View style={[styles.rowIcon, { backgroundColor: `${colors.amber}20` }]}>
+            <Ionicons name="thermometer-outline" size={18} color={colors.amber} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Temperature Unit</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+              Used for body temperature readings
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {(["F", "C"] as const).map((unit) => {
+              const active = tempUnit === unit;
+              return (
+                <Pressable
+                  key={unit}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setTempUnit(unit);
+                  }}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: active ? colors.amber : colors.backgroundSecondary,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: active ? colors.amber : colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: active ? "#fff" : colors.textSecondary }}>
+                    °{unit}
                   </Text>
                 </Pressable>
               );

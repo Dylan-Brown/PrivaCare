@@ -200,6 +200,12 @@ type AppContextType = {
 
   userProfile: UserProfile;
   setUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
+
+  vitalReadings: VitalReading[];
+  addVitalReading: (r: Omit<VitalReading, "id">) => Promise<void>;
+  deleteVitalReading: (id: string) => Promise<void>;
+  tempUnit: "F" | "C";
+  setTempUnit: (u: "F" | "C") => Promise<void>;
 };
 
 function generateId(): string {
@@ -253,6 +259,17 @@ const DEFAULT_USER_PROFILE: UserProfile = {
   compoundMedicationsEnabled: false,
 };
 
+export type VitalType = "SpO2" | "BloodPressure" | "TempOral" | "TempForehead";
+
+export type VitalReading = {
+  id: string;
+  type: VitalType;
+  value: number | { systolic: number; diastolic: number };
+  unit: string;
+  timestamp: string;
+  note?: string;
+};
+
 const STORAGE_KEYS = {
   MEDICATIONS: "@healthtrack_medications",
   MED_GROUPS: "@healthtrack_med_groups",
@@ -265,6 +282,8 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: "@vital_notifications",
   INSIGHTS_WEEKLY: "@vital_insights_last_weekly",
   INSIGHTS_MONTHLY: "@vital_insights_last_monthly",
+  VITAL_READINGS: "@privacre_vital_readings",
+  TEMP_UNIT: "@privacre_temp_unit",
 };
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -280,13 +299,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfileState] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [dayLogs, setDayLogs] = useState<Record<string, DayLog>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [vitalReadings, setVitalReadings] = useState<VitalReading[]>([]);
+  const [tempUnit, setTempUnitState] = useState<"F" | "C">("F");
 
   // ─── Load all data ────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
         const [meds, groups, medLogs, products, routines, skinLogs,
-               profileRaw, dayLogsRaw, notifsRaw] = await Promise.all([
+               profileRaw, dayLogsRaw, notifsRaw, vitalsRaw, tempUnitRaw] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.MEDICATIONS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_GROUPS),
           AsyncStorage.getItem(STORAGE_KEYS.MED_LOGS),
@@ -296,6 +317,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE),
           AsyncStorage.getItem(STORAGE_KEYS.DAY_LOGS),
           AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
+          AsyncStorage.getItem(STORAGE_KEYS.VITAL_READINGS),
+          AsyncStorage.getItem(STORAGE_KEYS.TEMP_UNIT),
         ]);
         if (meds) setMedications((JSON.parse(meds) as any[]).map((m, i) => migrateMedication(m, i)));
         if (groups) setMedicationGroups(JSON.parse(groups));
@@ -306,6 +329,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (profileRaw) setUserProfileState({ ...DEFAULT_USER_PROFILE, ...JSON.parse(profileRaw) });
         if (dayLogsRaw) setDayLogs(JSON.parse(dayLogsRaw));
         if (notifsRaw) setNotifications(JSON.parse(notifsRaw));
+        if (vitalsRaw) setVitalReadings(JSON.parse(vitalsRaw));
+        if (tempUnitRaw === "F" || tempUnitRaw === "C") setTempUnitState(tempUnitRaw);
       } catch (e) {
         console.error("Error loading data", e);
       } finally {
@@ -343,6 +368,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(next));
       return next;
     });
+  }, []);
+
+  // ─── Vital readings ────────────────────────────────────────────────────────
+  const addVitalReading = useCallback(async (r: Omit<VitalReading, "id">) => {
+    const newReading: VitalReading = { ...r, id: generateId() };
+    setVitalReadings(prev => {
+      const updated = [newReading, ...prev];
+      AsyncStorage.setItem(STORAGE_KEYS.VITAL_READINGS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const deleteVitalReading = useCallback(async (id: string) => {
+    setVitalReadings(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      AsyncStorage.setItem(STORAGE_KEYS.VITAL_READINGS, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const setTempUnit = useCallback(async (u: "F" | "C") => {
+    setTempUnitState(u);
+    await AsyncStorage.setItem(STORAGE_KEYS.TEMP_UNIT, u);
   }, []);
 
   // ─── Medications ──────────────────────────────────────────────────────────
@@ -1037,6 +1085,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deleteNotification,
     userProfile,
     setUserProfile,
+    vitalReadings,
+    addVitalReading,
+    deleteVitalReading,
+    tempUnit,
+    setTempUnit,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
