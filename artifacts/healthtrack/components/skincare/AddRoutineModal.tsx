@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,7 +19,7 @@ import { SkincareRoutine, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 
 const COLORS = ["#FF6B6B", "#FF9F0A", "#34C78B", "#007AFF", "#AF52DE", "#FF6CBF", "#5AC8FA", "#FF8C42"];
-const TIME_LABELS = ["AM Routine", "PM Routine", "Morning", "Evening", "Weekly", "Custom"];
+const PRESET_TIMES = ["AM Routine", "PM Routine", "Morning", "Evening", "Weekly", "Custom"];
 
 type Props = {
   visible: boolean;
@@ -32,10 +32,35 @@ export function AddRoutineModal({ visible, onClose, editRoutine }: Props) {
   const { skincareProducts, addSkincareRoutine, updateSkincareRoutine } = useApp();
   const insets = useSafeAreaInsets();
 
-  const [name, setName] = useState(editRoutine?.name || "");
-  const [timeLabel, setTimeLabel] = useState(editRoutine?.timeLabel || "AM Routine");
-  const [selectedProducts, setSelectedProducts] = useState<string[]>(editRoutine?.productIds || []);
-  const [selectedColor, setSelectedColor] = useState(editRoutine?.color || COLORS[0]);
+  const [name, setName] = useState("");
+  const [timeLabel, setTimeLabel] = useState("AM Routine");
+  const [customTime, setCustomTime] = useState("");
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+
+  useEffect(() => {
+    if (visible) {
+      if (editRoutine) {
+        setName(editRoutine.name);
+        const isPreset = PRESET_TIMES.slice(0, -1).includes(editRoutine.timeLabel);
+        if (isPreset) {
+          setTimeLabel(editRoutine.timeLabel);
+          setCustomTime("");
+        } else {
+          setTimeLabel("Custom");
+          setCustomTime(editRoutine.timeLabel);
+        }
+        setSelectedProducts(editRoutine.productIds);
+        setSelectedColor(editRoutine.color || COLORS[0]);
+      } else {
+        setName("");
+        setTimeLabel("AM Routine");
+        setCustomTime("");
+        setSelectedProducts([]);
+        setSelectedColor(COLORS[0]);
+      }
+    }
+  }, [visible]);
 
   const toggleProduct = (id: string) => {
     setSelectedProducts(prev =>
@@ -43,27 +68,37 @@ export function AddRoutineModal({ visible, onClose, editRoutine }: Props) {
     );
   };
 
-  const reset = () => {
-    if (!editRoutine) {
-      setName(""); setTimeLabel("AM Routine");
-      setSelectedProducts([]); setSelectedColor(COLORS[0]);
+  const handleCustomTimeChange = (text: string) => {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length <= 3) {
+      setCustomTime(text);
+    } else {
+      setCustomTime(words.slice(0, 3).join(" "));
     }
   };
+
+  const resolvedTimeLabel =
+    timeLabel === "Custom"
+      ? (customTime.trim() || "Custom")
+      : timeLabel;
 
   const handleSave = async () => {
     if (!name.trim()) { Alert.alert("Required", "Please enter a routine name."); return; }
     if (selectedProducts.length === 0) { Alert.alert("Required", "Please select at least one product."); return; }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (timeLabel === "Custom" && !customTime.trim()) {
+      Alert.alert("Required", "Please enter a custom time label.");
+      return;
+    }
+    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     if (editRoutine) {
       await updateSkincareRoutine(editRoutine.id, {
-        name: name.trim(), timeLabel, productIds: selectedProducts, color: selectedColor,
+        name: name.trim(), timeLabel: resolvedTimeLabel, productIds: selectedProducts, color: selectedColor,
       });
     } else {
       await addSkincareRoutine({
-        name: name.trim(), timeLabel, productIds: selectedProducts, color: selectedColor,
+        name: name.trim(), timeLabel: resolvedTimeLabel, productIds: selectedProducts, color: selectedColor,
       });
     }
-    reset();
     onClose();
   };
 
@@ -103,7 +138,7 @@ export function AddRoutineModal({ visible, onClose, editRoutine }: Props) {
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>TIME</Text>
             <View style={styles.chipGrid}>
-              {TIME_LABELS.map(t => (
+              {PRESET_TIMES.map(t => (
                 <Pressable
                   key={t} onPress={() => setTimeLabel(t)}
                   style={[styles.chip, {
@@ -115,6 +150,27 @@ export function AddRoutineModal({ visible, onClose, editRoutine }: Props) {
                 </Pressable>
               ))}
             </View>
+
+            {timeLabel === "Custom" && (
+              <View style={[styles.customInputRow, { borderTopColor: colors.border }]}>
+                <TextInput
+                  style={[styles.customInput, {
+                    color: colors.text,
+                    backgroundColor: colors.borderLight,
+                    borderColor: colors.border,
+                  }]}
+                  placeholder="Up to 3 words (e.g. Post Shower)"
+                  placeholderTextColor={colors.textTertiary}
+                  value={customTime}
+                  onChangeText={handleCustomTimeChange}
+                  maxLength={40}
+                  returnKeyType="done"
+                />
+                <Text style={[styles.wordCount, { color: colors.textTertiary }]}>
+                  {customTime.trim() ? customTime.trim().split(/\s+/).filter(Boolean).length : 0}/3 words
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -186,6 +242,13 @@ const styles = StyleSheet.create({
   chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, borderWidth: 1 },
   chipText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  customInputRow: { marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
+  customInput: {
+    fontSize: 15, fontFamily: "Inter_400Regular",
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12, borderWidth: 1,
+  },
+  wordCount: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right", marginTop: 4 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", fontStyle: "italic" },
   productRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
