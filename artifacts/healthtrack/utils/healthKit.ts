@@ -93,6 +93,112 @@ export async function requestHealthKitPermissions(): Promise<{
   }
 }
 
+export async function requestVitalsHealthKitPermissions(): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const HK = await getHK();
+  if (!HK) {
+    return {
+      success: false,
+      message:
+        "Apple Health is only available on a native iOS build.",
+    };
+  }
+  try {
+    const available = await HK.isHealthDataAvailable();
+    if (!available) {
+      return { success: false, message: "Apple Health is not available on this device." };
+    }
+    await HK.requestAuthorization({
+      toShare: [
+        "HKQuantityTypeIdentifierOxygenSaturation",
+        "HKQuantityTypeIdentifierBodyTemperature",
+        "HKCorrelationTypeIdentifierBloodPressure",
+        "HKQuantityTypeIdentifierBloodPressureSystolic",
+        "HKQuantityTypeIdentifierBloodPressureDiastolic",
+      ],
+      toRead: [],
+    });
+    return { success: true, message: "Vitals access granted" };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: "Could not connect to Apple Health for vitals. This requires a native iOS build.",
+    };
+  }
+}
+
+export async function saveVitalToHealthKit(reading: {
+  type: "SpO2" | "BloodPressure" | "TempOral" | "TempForehead";
+  value: number | { systolic: number; diastolic: number };
+  timestamp: string;
+}): Promise<void> {
+  const enabled = await getHealthKitSyncEnabled();
+  if (!enabled) return;
+
+  const HK = await getHK();
+  if (!HK) return;
+
+  try {
+    const at = new Date(reading.timestamp);
+
+    if (reading.type === "SpO2" && typeof reading.value === "number") {
+      await HK.saveQuantitySample(
+        "HKQuantityTypeIdentifierOxygenSaturation",
+        "HKUnit.percent",
+        reading.value / 100,
+        at,
+        at
+      );
+    } else if (
+      (reading.type === "TempOral" || reading.type === "TempForehead") &&
+      typeof reading.value === "number"
+    ) {
+      await HK.saveQuantitySample(
+        "HKQuantityTypeIdentifierBodyTemperature",
+        "HKUnit.degreeFahrenheit",
+        reading.value,
+        at,
+        at,
+        {
+          HKMetadataKeyBodyTemperatureSensorLocation:
+            reading.type === "TempOral" ? 1 : 0,
+        }
+      );
+    } else if (
+      reading.type === "BloodPressure" &&
+      typeof reading.value === "object" &&
+      reading.value !== null
+    ) {
+      const bp = reading.value as { systolic: number; diastolic: number };
+      await HK.saveCorrelationSample(
+        "HKCorrelationTypeIdentifierBloodPressure",
+        [
+          {
+            quantityType: "HKQuantityTypeIdentifierBloodPressureSystolic",
+            unit: "HKUnit.millimeterOfMercury",
+            value: bp.systolic,
+            startDate: at,
+            endDate: at,
+          },
+          {
+            quantityType: "HKQuantityTypeIdentifierBloodPressureDiastolic",
+            unit: "HKUnit.millimeterOfMercury",
+            value: bp.diastolic,
+            startDate: at,
+            endDate: at,
+          },
+        ],
+        at,
+        at
+      );
+    }
+  } catch (err) {
+    console.warn("[HealthKit] Failed to save vital reading:", err);
+  }
+}
+
 export async function logMedicationDoseToHealthKit(
   medicationName: string,
   takenAt: Date

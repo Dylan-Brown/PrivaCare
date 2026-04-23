@@ -30,6 +30,16 @@ const RANGES: { key: RangeKey; label: string; days: number }[] = [
   { key: "12M", label: "12M", days: 365 },
 ];
 
+type ScalarReading = { id: string; type: Exclude<VitalType, "BloodPressure">; value: number; unit: string; timestamp: string; note?: string };
+type BPReading = { id: string; type: "BloodPressure"; value: { systolic: number; diastolic: number }; unit: string; timestamp: string; note?: string };
+
+function isScalarReading(r: VitalReading): r is ScalarReading {
+  return r.type !== "BloodPressure" && typeof r.value === "number";
+}
+function isBPReading(r: VitalReading): r is BPReading {
+  return r.type === "BloodPressure" && typeof r.value === "object" && r.value !== null;
+}
+
 type MetricDef = {
   type: VitalType;
   label: string;
@@ -44,7 +54,7 @@ type MetricDef = {
   yMinC?: number;
   yMaxC?: number;
   unit: (tempUnit: "F" | "C") => string;
-  formatValue: (v: VitalReading["value"], tempUnit: "F" | "C") => string;
+  formatValue: (r: VitalReading, tempUnit: "F" | "C") => string;
   isBP?: boolean;
 };
 
@@ -59,7 +69,10 @@ const METRICS: MetricDef[] = [
     yMin: 85,
     yMax: 100,
     unit: () => "%",
-    formatValue: (v) => `${v}%`,
+    formatValue: (r) => {
+      if (isScalarReading(r)) return `${r.value}%`;
+      return "";
+    },
   },
   {
     type: "BloodPressure",
@@ -67,11 +80,9 @@ const METRICS: MetricDef[] = [
     icon: "pulse-outline",
     color: "#FF375F",
     unit: () => "mmHg",
-    formatValue: (v) => {
-      if (typeof v === "object" && v !== null && "systolic" in v) {
-        return `${(v as any).systolic}/${(v as any).diastolic}`;
-      }
-      return String(v);
+    formatValue: (r) => {
+      if (isBPReading(r)) return `${r.value.systolic}/${r.value.diastolic} mmHg`;
+      return "";
     },
     isBP: true,
   },
@@ -89,7 +100,10 @@ const METRICS: MetricDef[] = [
     yMinC: 35,
     yMaxC: 40,
     unit: (u) => `°${u}`,
-    formatValue: (v, u) => `${v}°${u}`,
+    formatValue: (r, u) => {
+      if (isScalarReading(r)) return `${r.value}°${u}`;
+      return "";
+    },
   },
   {
     type: "TempForehead",
@@ -105,7 +119,10 @@ const METRICS: MetricDef[] = [
     yMinC: 35,
     yMaxC: 40,
     unit: (u) => `°${u}`,
-    formatValue: (v, u) => `${v}°${u}`,
+    formatValue: (r, u) => {
+      if (isScalarReading(r)) return `${r.value}°${u}`;
+      return "";
+    },
   },
 ];
 
@@ -117,19 +134,53 @@ function formatXLabel(ts: string, range: RangeKey): string {
     return `${h % 12 === 0 ? 12 : h % 12}${ampm}`;
   }
   const month = d.toLocaleString("default", { month: "short" });
-  if (range === "1W") return `${d.getDate()}`;
   return `${month} ${d.getDate()}`;
 }
 
+function formatWindowLabel(range: RangeKey, windowOffset: number): string {
+  const days = RANGES.find(r => r.key === range)!.days;
+  const end = new Date(Date.now() - windowOffset * days * 24 * 60 * 60 * 1000);
+  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+
+  if (windowOffset === 0) {
+    if (range === "1D") return "Today";
+    if (range === "1W") return "Past 7 days";
+    if (range === "1M") return "Past 30 days";
+    if (range === "3M") return "Past 90 days";
+    return "Past 12 months";
+  }
+
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  if (range === "1D") {
+    return end.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric",
+    });
+  }
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
 function formatFullDateTime(ts: string): string {
-  const d = new Date(ts);
-  return d.toLocaleString("en-US", {
+  return new Date(ts).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
   });
+}
+
+function isReadingOutOfRange(r: VitalReading, normalMin?: number, normalMax?: number): boolean {
+  if (isScalarReading(r)) {
+    return (normalMin !== undefined && r.value < normalMin) ||
+           (normalMax !== undefined && r.value > normalMax);
+  }
+  if (isBPReading(r)) {
+    return r.value.systolic > 120 || r.value.systolic < 90 ||
+           r.value.diastolic > 80 || r.value.diastolic < 60;
+  }
+  return false;
 }
 
 function MetricSection({
@@ -153,36 +204,34 @@ function MetricSection({
   const yMin = isTemp && tempUnit === "C" ? metric.yMinC : metric.yMin;
   const yMax = isTemp && tempUnit === "C" ? metric.yMaxC : metric.yMax;
 
-  const chartData = useMemo(() => {
-    if (metric.isBP) {
-      return {
-        systolic: readings.map(r => ({
-          value: typeof r.value === "object" ? (r.value as any).systolic : 0,
-          label: formatXLabel(r.timestamp, range),
-          timestamp: r.timestamp,
-        })),
-        diastolic: readings.map(r => ({
-          value: typeof r.value === "object" ? (r.value as any).diastolic : 0,
-          label: formatXLabel(r.timestamp, range),
-          timestamp: r.timestamp,
-        })),
-      };
-    }
-    return readings.map(r => ({
-      value: typeof r.value === "number" ? r.value : 0,
+  const latest = readings[0];
+
+  const scalarData = useMemo(() => {
+    if (metric.isBP) return null;
+    return readings.filter(isScalarReading).map(r => ({
+      value: r.value,
       label: formatXLabel(r.timestamp, range),
       timestamp: r.timestamp,
     }));
   }, [readings, range, metric.isBP]);
 
-  const latest = readings[0];
-  const latestDisplay = latest
-    ? metric.formatValue(latest.value, tempUnit)
-    : null;
+  const systolicData = useMemo(() => {
+    if (!metric.isBP) return null;
+    return readings.filter(isBPReading).map(r => ({
+      value: r.value.systolic,
+      label: formatXLabel(r.timestamp, range),
+      timestamp: r.timestamp,
+    }));
+  }, [readings, range, metric.isBP]);
 
-  const isOutOfRange = (v: number) =>
-    (normalMin !== undefined && v < normalMin) ||
-    (normalMax !== undefined && v > normalMax);
+  const diastolicData = useMemo(() => {
+    if (!metric.isBP) return null;
+    return readings.filter(isBPReading).map(r => ({
+      value: r.value.diastolic,
+      label: formatXLabel(r.timestamp, range),
+      timestamp: r.timestamp,
+    }));
+  }, [readings, range, metric.isBP]);
 
   return (
     <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -192,9 +241,9 @@ function MetricSection({
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.metricLabel, { color: colors.text }]}>{metric.label}</Text>
-          {latestDisplay && (
+          {latest && (
             <Text style={[styles.metricLatest, { color: metric.color }]}>
-              Latest: {latestDisplay}
+              Latest: {metric.formatValue(latest, tempUnit)}
             </Text>
           )}
         </View>
@@ -213,36 +262,40 @@ function MetricSection({
         </View>
       ) : metric.isBP ? (
         <>
-          <Text style={[styles.bpChartLabel, { color: colors.textSecondary }]}>Systolic</Text>
-          <VitalsLineChart
-            data={(chartData as any).systolic}
-            width={CHART_WIDTH - 32}
-            height={140}
-            normalMin={90}
-            normalMax={120}
-            yMin={60}
-            yMax={180}
-            color="#FF375F"
-            colors={colors}
-            unit="mmHg"
-          />
-          <Text style={[styles.bpChartLabel, { color: colors.textSecondary, marginTop: 8 }]}>Diastolic</Text>
-          <VitalsLineChart
-            data={(chartData as any).diastolic}
-            width={CHART_WIDTH - 32}
-            height={140}
-            normalMin={60}
-            normalMax={80}
-            yMin={40}
-            yMax={120}
-            color="#FF6B6B"
-            colors={colors}
-            unit="mmHg"
-          />
+          {systolicData && systolicData.length > 0 && (
+            <>
+              <Text style={[styles.bpChartLabel, { color: colors.textSecondary }]}>Systolic</Text>
+              <VitalsLineChart
+                data={systolicData}
+                width={CHART_WIDTH - 32}
+                height={140}
+                normalMin={90}
+                normalMax={120}
+                yMin={60}
+                yMax={180}
+                color="#FF375F"
+                colors={colors}
+                unit="mmHg"
+              />
+              <Text style={[styles.bpChartLabel, { color: colors.textSecondary, marginTop: 8 }]}>Diastolic</Text>
+              <VitalsLineChart
+                data={diastolicData ?? []}
+                width={CHART_WIDTH - 32}
+                height={140}
+                normalMin={60}
+                normalMax={80}
+                yMin={40}
+                yMax={120}
+                color="#FF6B6B"
+                colors={colors}
+                unit="mmHg"
+              />
+            </>
+          )}
         </>
       ) : (
         <VitalsLineChart
-          data={chartData as any}
+          data={scalarData ?? []}
           width={CHART_WIDTH - 32}
           height={160}
           normalMin={normalMin}
@@ -260,44 +313,42 @@ function MetricSection({
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <Text style={[styles.readingsTitle, { color: colors.textSecondary }]}>Readings</Text>
           {readings.slice(0, 10).map(r => {
-            const display = metric.formatValue(r.value, tempUnit);
-            let outOfRange = false;
-            if (!metric.isBP && typeof r.value === "number") {
-              outOfRange = isOutOfRange(r.value);
-            } else if (metric.isBP && typeof r.value === "object") {
-              const bp = r.value as any;
-              outOfRange = bp.systolic > 120 || bp.systolic < 90 || bp.diastolic > 80 || bp.diastolic < 60;
-            }
+            const display = metric.formatValue(r, tempUnit);
+            const outOfRange = isReadingOutOfRange(r, normalMin, normalMax);
             return (
-              <Pressable
+              <View
                 key={r.id}
-                onLongPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  Alert.alert(
-                    "Delete Reading",
-                    `Delete this reading (${display})?`,
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      { text: "Delete", style: "destructive", onPress: () => onDelete(r.id) },
-                    ]
-                  );
-                }}
                 style={[styles.readingRow, { borderBottomColor: colors.borderLight }]}
               >
                 <View style={[styles.readingDot, { backgroundColor: outOfRange ? "#FF6B6B" : metric.color }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.readingValue, { color: outOfRange ? "#FF6B6B" : colors.text }]}>
                     {display}
-                    {outOfRange && (
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular" }}> ⚠️ out of range</Text>
-                    )}
+                    {outOfRange ? "  ⚠ out of range" : ""}
                   </Text>
                   <Text style={[styles.readingTime, { color: colors.textTertiary }]}>
                     {formatFullDateTime(r.timestamp)}
-                    {r.note ? ` · ${r.note}` : ""}
+                    {r.note ? `  ·  ${r.note}` : ""}
                   </Text>
                 </View>
-              </Pressable>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    Alert.alert(
+                      "Delete Reading",
+                      `Delete this reading (${display})?`,
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "Delete", style: "destructive", onPress: () => onDelete(r.id) },
+                      ]
+                    );
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                >
+                  <Ionicons name="trash-outline" size={16} color={colors.textTertiary} />
+                </Pressable>
+              </View>
             );
           })}
           {readings.length > 10 && (
@@ -317,24 +368,37 @@ export default function VitalsHistoryScreen() {
   const router = useRouter();
   const { vitalReadings, deleteVitalReading, tempUnit } = useApp();
   const [range, setRange] = useState<RangeKey>("1W");
+  const [windowOffset, setWindowOffset] = useState(0);
 
-  const cutoff = useMemo(() => {
+  const { windowStart, windowEnd } = useMemo(() => {
     const days = RANGES.find(r => r.key === range)!.days;
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  }, [range]);
+    const end = new Date(Date.now() - windowOffset * days * 24 * 60 * 60 * 1000);
+    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    return { windowStart: start, windowEnd: end };
+  }, [range, windowOffset]);
 
   const filteredByType = useCallback(
     (type: VitalType) =>
       vitalReadings
-        .filter(r => r.type === type && new Date(r.timestamp) >= cutoff)
+        .filter(r => r.type === type &&
+          new Date(r.timestamp) >= windowStart &&
+          new Date(r.timestamp) <= windowEnd)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
-    [vitalReadings, cutoff]
+    [vitalReadings, windowStart, windowEnd]
   );
 
   const handleDelete = useCallback((id: string) => {
     deleteVitalReading(id);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   }, [deleteVitalReading]);
+
+  const handleRangeChange = (newRange: RangeKey) => {
+    Haptics.selectionAsync();
+    setRange(newRange);
+    setWindowOffset(0);
+  };
+
+  const canGoForward = windowOffset > 0;
 
   return (
     <>
@@ -362,10 +426,7 @@ export default function VitalsHistoryScreen() {
             return (
               <Pressable
                 key={r.key}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setRange(r.key);
-                }}
+                onPress={() => handleRangeChange(r.key)}
                 style={[
                   styles.rangeBtn,
                   { backgroundColor: active ? colors.tint : "transparent" },
@@ -377,6 +438,32 @@ export default function VitalsHistoryScreen() {
               </Pressable>
             );
           })}
+        </View>
+
+        <View style={styles.windowNav}>
+          <Pressable
+            onPress={() => {
+              Haptics.selectionAsync();
+              setWindowOffset(prev => prev + 1);
+            }}
+            style={styles.windowArrow}
+          >
+            <Ionicons name="chevron-back" size={20} color={colors.text} />
+          </Pressable>
+          <Text style={[styles.windowLabel, { color: colors.text }]}>
+            {formatWindowLabel(range, windowOffset)}
+          </Text>
+          <Pressable
+            onPress={() => {
+              if (!canGoForward) return;
+              Haptics.selectionAsync();
+              setWindowOffset(prev => prev - 1);
+            }}
+            style={[styles.windowArrow, { opacity: canGoForward ? 1 : 0.3 }]}
+            disabled={!canGoForward}
+          >
+            <Ionicons name="chevron-forward" size={20} color={colors.text} />
+          </Pressable>
         </View>
 
         {METRICS.map(metric => (
@@ -394,7 +481,7 @@ export default function VitalsHistoryScreen() {
         <View style={[styles.disclaimerCard, { backgroundColor: colors.amberLight, borderColor: `${colors.amber}30` }]}>
           <Ionicons name="warning-outline" size={14} color={colors.amber} />
           <Text style={[styles.disclaimerText, { color: colors.amber }]}>
-            For informational tracking only. Consult a healthcare provider for medical advice. Long-press any reading to delete it.
+            For informational tracking only. Consult a healthcare provider for medical advice.
           </Text>
         </View>
       </ScrollView>
@@ -420,6 +507,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   rangeBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+
+  windowNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: -4,
+  },
+  windowArrow: { padding: 8 },
+  windowLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", flex: 1, textAlign: "center" },
 
   metricCard: {
     borderRadius: 16,

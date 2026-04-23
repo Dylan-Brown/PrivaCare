@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
+
 import { Stack, useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -408,17 +409,31 @@ export default function TodayScreen() {
           <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
         </Pressable>
 
-        <Pressable
-          style={[styles.logReactionsBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push("/vitals-history")}
-        >
-          <Ionicons name="pulse-outline" size={20} color={colors.blue} />
-          <View style={styles.logReactionsBtnInfo}>
-            <Text style={[styles.logReactionsBtnTitle, { color: colors.text }]}>Track Vital Signs</Text>
-            <Text style={[styles.logReactionsBtnSub, { color: colors.textSecondary }]}>Blood oxygen, pressure, temperature</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-        </Pressable>
+        <View style={[styles.logReactionsBtn, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: "column", gap: 0, padding: 0 }]}>
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14 }}
+            onPress={() => router.push("/vitals-log")}
+          >
+            <Ionicons name="add-circle-outline" size={20} color={colors.blue} />
+            <View style={styles.logReactionsBtnInfo}>
+              <Text style={[styles.logReactionsBtnTitle, { color: colors.text }]}>Log Vital Signs</Text>
+              <Text style={[styles.logReactionsBtnSub, { color: colors.textSecondary }]}>Blood oxygen, pressure, temperature</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </Pressable>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.borderLight, marginHorizontal: 14 }} />
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14 }}
+            onPress={() => router.push("/vitals-history")}
+          >
+            <Ionicons name="pulse-outline" size={20} color={colors.blue} />
+            <View style={styles.logReactionsBtnInfo}>
+              <Text style={[styles.logReactionsBtnTitle, { color: colors.text }]}>View Vitals History</Text>
+              <Text style={[styles.logReactionsBtnSub, { color: colors.textSecondary }]}>Charts and trends over time</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </Pressable>
+        </View>
       </ScrollView>
 
       <GroupDetailModal

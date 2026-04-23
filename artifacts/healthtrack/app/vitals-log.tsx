@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -69,6 +69,32 @@ const METRICS: MetricConfig[] = [
   },
 ];
 
+function nowDateStr(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function nowTimeStr(): string {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${min}`;
+}
+
+function parseDateTime(dateStr: string, timeStr: string): Date | null {
+  try {
+    const iso = `${dateStr.trim()}T${timeStr.trim()}:00`;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return d;
+  } catch {
+    return null;
+  }
+}
+
 export default function VitalsLogScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -80,12 +106,28 @@ export default function VitalsLogScreen() {
   const [systolic, setSystolic] = useState("");
   const [diastolic, setDiastolic] = useState("");
   const [note, setNote] = useState("");
+  const [dateStr, setDateStr] = useState(nowDateStr());
+  const [timeStr, setTimeStr] = useState(nowTimeStr());
   const [saving, setSaving] = useState(false);
 
   const metric = METRICS.find(m => m.type === selectedType)!;
 
+  const resolvedTimestamp = useMemo((): Date => {
+    return parseDateTime(dateStr, timeStr) ?? new Date();
+  }, [dateStr, timeStr]);
+
   const handleSave = useCallback(async () => {
     if (saving) return;
+
+    const ts = parseDateTime(dateStr, timeStr);
+    if (!ts) {
+      Alert.alert("Invalid Date/Time", "Please enter a valid date (YYYY-MM-DD) and time (HH:MM).");
+      return;
+    }
+    if (ts > new Date()) {
+      Alert.alert("Invalid Date/Time", "The recorded time cannot be in the future.");
+      return;
+    }
 
     if (metric.isBP) {
       const sys = parseFloat(systolic);
@@ -103,7 +145,7 @@ export default function VitalsLogScreen() {
         type: "BloodPressure",
         value: { systolic: sys, diastolic: dia },
         unit: "mmHg",
-        timestamp: new Date().toISOString(),
+        timestamp: ts.toISOString(),
         note: note.trim() || undefined,
       });
     } else {
@@ -116,11 +158,12 @@ export default function VitalsLogScreen() {
         Alert.alert("Invalid Value", "SpO₂ must be between 50 and 100%.");
         return;
       }
-      if ((selectedType === "TempOral" || selectedType === "TempForehead") && tempUnit === "F" && (num < 90 || num > 110)) {
+      const isTemp = selectedType === "TempOral" || selectedType === "TempForehead";
+      if (isTemp && tempUnit === "F" && (num < 90 || num > 110)) {
         Alert.alert("Invalid Value", "Temperature must be between 90°F and 110°F.");
         return;
       }
-      if ((selectedType === "TempOral" || selectedType === "TempForehead") && tempUnit === "C" && (num < 32 || num > 43)) {
+      if (isTemp && tempUnit === "C" && (num < 32 || num > 43)) {
         Alert.alert("Invalid Value", "Temperature must be between 32°C and 43°C.");
         return;
       }
@@ -129,14 +172,14 @@ export default function VitalsLogScreen() {
         type: selectedType,
         value: num,
         unit: metric.unit(tempUnit),
-        timestamp: new Date().toISOString(),
+        timestamp: ts.toISOString(),
         note: note.trim() || undefined,
       });
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
-  }, [saving, metric, systolic, diastolic, value, note, selectedType, tempUnit, addVitalReading, router]);
+  }, [saving, metric, systolic, diastolic, value, note, selectedType, tempUnit, dateStr, timeStr, addVitalReading, router]);
 
   return (
     <>
@@ -148,7 +191,7 @@ export default function VitalsLogScreen() {
             <Pressable
               onPress={handleSave}
               disabled={saving}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, paddingHorizontal: 4 })}
+              style={({ pressed }) => ({ opacity: pressed || saving ? 0.6 : 1, paddingHorizontal: 4 })}
             >
               <Text style={[styles.saveBtn, { color: colors.tint }]}>Save</Text>
             </Pressable>
@@ -167,7 +210,7 @@ export default function VitalsLogScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>SELECT METRIC</Text>
-          <View style={[styles.metricGrid]}>
+          <View style={styles.metricGrid}>
             {METRICS.map(m => {
               const active = selectedType === m.type;
               return (
@@ -190,10 +233,7 @@ export default function VitalsLogScreen() {
                 >
                   <Ionicons name={m.icon as any} size={18} color={active ? m.color : colors.textSecondary} />
                   <Text
-                    style={[
-                      styles.metricChipLabel,
-                      { color: active ? m.color : colors.textSecondary },
-                    ]}
+                    style={[styles.metricChipLabel, { color: active ? m.color : colors.textSecondary }]}
                     numberOfLines={2}
                   >
                     {m.label}
@@ -266,11 +306,58 @@ export default function VitalsLogScreen() {
             )}
           </View>
 
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: 16 }]}>RECORDED AT</Text>
+          <View style={[styles.timeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.timeRow}>
+              <View style={[styles.timeIcon, { backgroundColor: `${colors.tint}18` }]}>
+                <Ionicons name="calendar-outline" size={18} color={colors.tint} />
+              </View>
+              <Text style={[styles.timeFieldLabel, { color: colors.textSecondary }]}>Date</Text>
+              <TextInput
+                style={[styles.timeInput, { color: colors.text, borderColor: colors.border }]}
+                value={dateStr}
+                onChangeText={setDateStr}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "default"}
+                maxLength={10}
+                returnKeyType="next"
+              />
+            </View>
+            <View style={[styles.timeDivider, { backgroundColor: colors.borderLight }]} />
+            <View style={styles.timeRow}>
+              <View style={[styles.timeIcon, { backgroundColor: `${colors.tint}18` }]}>
+                <Ionicons name="time-outline" size={18} color={colors.tint} />
+              </View>
+              <Text style={[styles.timeFieldLabel, { color: colors.textSecondary }]}>Time</Text>
+              <TextInput
+                style={[styles.timeInput, { color: colors.text, borderColor: colors.border }]}
+                value={timeStr}
+                onChangeText={setTimeStr}
+                placeholder="HH:MM"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType={Platform.OS === "ios" ? "numbers-and-punctuation" : "default"}
+                maxLength={5}
+                returnKeyType="done"
+              />
+            </View>
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync();
+                setDateStr(nowDateStr());
+                setTimeStr(nowTimeStr());
+              }}
+              style={({ pressed }) => [styles.resetTimeBtn, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Text style={[styles.resetTimeBtnText, { color: colors.tint }]}>Reset to now</Text>
+            </Pressable>
+          </View>
+
           <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: 16 }]}>NOTE (OPTIONAL)</Text>
           <View style={[styles.noteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput
               style={[styles.noteInput, { color: colors.text }]}
-              placeholder="Add a note (e.g. after exercise, morning reading)…"
+              placeholder="e.g. after exercise, morning reading…"
               placeholderTextColor={colors.textTertiary}
               value={note}
               onChangeText={setNote}
@@ -359,7 +446,7 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 16, fontFamily: "Inter_700Bold" },
 
   bpRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
-  bpSep: { fontSize: 32, fontFamily: "Inter_300Light", paddingBottom: 12 },
+  bpSep: { fontSize: 32, paddingBottom: 12 },
   bpField: { flex: 1, alignItems: "center", gap: 4 },
   bpLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
   bpInput: {
@@ -373,6 +460,30 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   bpUnit: { fontSize: 11, fontFamily: "Inter_400Regular" },
+
+  timeCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  timeIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  timeFieldLabel: { fontSize: 14, fontFamily: "Inter_500Medium", width: 40 },
+  timeInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    textAlign: "right",
+  },
+  timeDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
+  resetTimeBtn: { paddingHorizontal: 14, paddingVertical: 10 },
+  resetTimeBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },
 
   noteCard: { borderRadius: 16, borderWidth: 1, padding: 14 },
   noteInput: {
