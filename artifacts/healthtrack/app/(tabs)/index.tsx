@@ -14,6 +14,7 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DayLogEntry, SkincareReactionNote, useApp } from "@/context/AppContext";
+import { DayTileCarousel } from "@/components/today/DayTileCarousel";
 import { useTheme } from "@/hooks/useTheme";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { GroupDetailModal } from "@/components/today/GroupDetailModal";
@@ -21,7 +22,6 @@ import {
   formatTime,
   formatNavDate,
   todayString,
-  toDateString,
   isDateExpired,
   isDateExpiringSoon,
 } from "@/utils/scheduleCompute";
@@ -84,22 +84,6 @@ function BellButton({ unread, onPress }: { unread: number; onPress: () => void }
   );
 }
 
-function DateNav({ date, onPrev, onNext }: { date: string; onPrev: () => void; onNext: () => void }) {
-  const { colors } = useTheme();
-  const today = todayString();
-  const canGoNext = date < today;
-  return (
-    <View style={styles.dateNav}>
-      <Pressable onPress={onPrev} style={styles.navArrow}>
-        <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
-      <Text style={[styles.dateNavText, { color: colors.text }]}>{formatNavDate(date)}</Text>
-      <Pressable onPress={onNext} style={[styles.navArrow, { opacity: canGoNext ? 1 : 0.3 }]} disabled={!canGoNext}>
-        <Ionicons name="chevron-forward" size={22} color={colors.text} />
-      </Pressable>
-    </View>
-  );
-}
 
 function GroupCard({
   group, completing, onComplete, onExpand, colors, medications, skincareProducts,
@@ -211,6 +195,7 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const {
     medications, skincareProducts,
+    medicationGroups, skincareRoutines,
     dayLogs, buildDayLog, getDayLog,
     completeAllInGroup,
     notifications,
@@ -236,19 +221,9 @@ export default function TodayScreen() {
   const reactions   = dayLog.reactionNotes ?? [];
   const unreadCount = notifications.filter(n => !n.read).length;
   const refillNeeded = getMedicationsNeedingRefill();
-  const today = todayString();
-
-  const goToPrevDay = () => {
-    const d = new Date(viewingDate + "T12:00:00");
-    d.setDate(d.getDate() - 1);
-    setViewingDate(toDateString(d));
-  };
-  const goToNextDay = () => {
-    if (viewingDate >= today) return;
-    const d = new Date(viewingDate + "T12:00:00");
-    d.setDate(d.getDate() + 1);
-    setViewingDate(toDateString(d));
-  };
+  const handleDateChange = useCallback((date: string) => {
+    setViewingDate(date);
+  }, []);
 
   const handleCompleteGroup = (group: DisplayGroup) => {
     if (completingKey) return;
@@ -287,7 +262,16 @@ export default function TodayScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        <DateNav date={viewingDate} onPrev={goToPrevDay} onNext={goToNextDay} />
+        <DayTileCarousel
+          viewingDate={viewingDate}
+          onDateChange={handleDateChange}
+          getDayLog={getDayLog}
+          buildDayLog={buildDayLog}
+          medicationGroups={medicationGroups}
+          skincareRoutines={skincareRoutines}
+          medications={medications}
+          skincareProducts={skincareProducts}
+        />
 
         {refillNeeded.length > 0 && (
           <Pressable
@@ -460,10 +444,6 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   bellBadgeText: { color: "#fff", fontSize: 9, fontFamily: "Inter_700Bold" },
-
-  dateNav: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 6 },
-  navArrow: { padding: 8 },
-  dateNavText: { fontSize: 17, fontFamily: "Inter_600SemiBold", flex: 1, textAlign: "center" },
 
   refillBanner: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1 },
   refillText: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
