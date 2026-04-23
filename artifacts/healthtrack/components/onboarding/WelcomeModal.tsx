@@ -111,8 +111,9 @@ export function WelcomeModal({ visible, onDone }: Props) {
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={handleScroll}
             keyExtractor={(_, i) => String(i)}
+            style={styles.list}
             renderItem={({ item }) => (
-              <View style={[styles.card, { width: SCREEN_WIDTH - 48 }]}>
+              <View style={[styles.card, { width: SCREEN_WIDTH }]}>
                 <View style={[styles.iconWrap, { backgroundColor: `${item.iconColor}18` }]}>
                   <Ionicons name={item.icon as any} size={40} color={item.iconColor} />
                 </View>
@@ -166,9 +167,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 12,
-    paddingHorizontal: 24,
     alignItems: "center",
     overflow: "hidden",
+  },
+  list: {
+    width: SCREEN_WIDTH,
   },
   handle: {
     width: 36,
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: "center",
     paddingVertical: 24,
-    paddingHorizontal: 4,
+    paddingHorizontal: 28,
     gap: 16,
   },
   iconWrap: {
@@ -215,7 +218,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   btn: {
-    width: "100%",
+    width: SCREEN_WIDTH - 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
