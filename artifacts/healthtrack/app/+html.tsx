@@ -28,6 +28,16 @@ export default function Root({ children }: PropsWithChildren) {
 
         <meta name="msapplication-TileColor" content="#34C78B" />
 
+        {/*
+          GitHub Pages SPA redirect receiver.
+          Companion to public/404.html — restores the URL from the ?p= param
+          set by the 404 redirect so deep links and refreshes work on GitHub Pages.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var p=new URLSearchParams(window.location.search).get('p');if(p){var h=new URLSearchParams(window.location.search).get('h')||'';var qs=window.location.search.replace(/[?&]p=[^&]*/,'').replace(/[?&]h=[^&]*/,'').replace(/^[?&]/,'');var url='/'+decodeURIComponent(p)+(qs?'?'+qs:'')+(h?'#'+decodeURIComponent(h):'');window.history.replaceState(null,null,url);}})();`,
+          }}
+        />
         <ScrollViewStyleReset />
 
         <style
