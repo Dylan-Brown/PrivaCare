@@ -18,6 +18,7 @@ import { DayLogEntry, SkincareReactionNote, useApp } from "@/context/AppContext"
 import { DayTileCarousel } from "@/components/today/DayTileCarousel";
 import { useTheme } from "@/hooks/useTheme";
 import { GroupDetailModal } from "@/components/today/GroupDetailModal";
+import { StreakCelebrationModal } from "@/components/today/StreakCelebrationModal";
 import {
   formatTime,
   formatNavDate,
@@ -353,14 +354,23 @@ export default function TodayScreen() {
     completeAllInGroup,
     notifications,
     getMedicationsNeedingRefill,
+    streak,
+    checkAndUpdateStreak,
   } = useApp();
 
-  const [viewingDate, setViewingDate]     = useState(todayString());
-  const [completingKey, setCompletingKey] = useState<string | null>(null);
-  const [detailGroup, setDetailGroup]     = useState<DisplayGroup | null>(null);
+  const [viewingDate, setViewingDate]         = useState(todayString());
+  const [completingKey, setCompletingKey]     = useState<string | null>(null);
+  const [detailGroup, setDetailGroup]         = useState<DisplayGroup | null>(null);
+  const [celebration, setCelebration]         = useState<number | null>(null); // milestone count
 
   useFocusEffect(useCallback(() => {
     buildDayLog(viewingDate);
+    // After the log is built, check streak (small timeout so dayLogs state settles)
+    const t = setTimeout(async () => {
+      const milestone = await checkAndUpdateStreak();
+      if (milestone !== null) setCelebration(milestone);
+    }, 600);
+    return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingDate]));
 
@@ -383,9 +393,12 @@ export default function TodayScreen() {
     if (completingKey) return;
     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setCompletingKey(group.groupKey);
-    setTimeout(() => {
-      completeAllInGroup(viewingDate, group.itemType, group.scheduledTime);
+    setTimeout(async () => {
+      await completeAllInGroup(viewingDate, group.itemType, group.scheduledTime);
       setCompletingKey(null);
+      // Check if completing this group finishes the whole day — if so, update streak
+      const milestone = await checkAndUpdateStreak();
+      if (milestone !== null) setCelebration(milestone);
     }, 950);
   };
 
@@ -593,6 +606,13 @@ export default function TodayScreen() {
         entries={detailEntries}
         date={viewingDate}
         allComplete={detailEntries.every(e => e.isComplete)}
+      />
+
+      <StreakCelebrationModal
+        visible={celebration !== null}
+        streakCount={streak.count}
+        milestoneCount={celebration ?? 1}
+        onClose={() => setCelebration(null)}
       />
     </View>
   );
