@@ -323,7 +323,7 @@ export default function SettingsScreen() {
                     paddingHorizontal: 10,
                     paddingVertical: 5,
                     borderRadius: 8,
-                    backgroundColor: active ? colors.tint : colors.backgroundSecondary,
+                    backgroundColor: active ? colors.tint : colors.card,
                     borderWidth: StyleSheet.hairlineWidth,
                     borderColor: active ? colors.tint : colors.border,
                   }}
@@ -360,7 +360,7 @@ export default function SettingsScreen() {
                     paddingHorizontal: 14,
                     paddingVertical: 5,
                     borderRadius: 8,
-                    backgroundColor: active ? colors.amber : colors.backgroundSecondary,
+                    backgroundColor: active ? colors.amber : colors.card,
                     borderWidth: StyleSheet.hairlineWidth,
                     borderColor: active ? colors.amber : colors.border,
                   }}
