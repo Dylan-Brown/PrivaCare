@@ -86,13 +86,14 @@ function computeBricks(
 
 type DayTileProps = {
   dayLog: DayLog;
+  today: string;
   medicationGroups: MedicationGroup[];
   skincareRoutines: SkincareRoutine[];
   medications: Medication[];
   skincareProducts: SkincareProduct[];
 };
 
-function DayTile({ dayLog, medicationGroups, skincareRoutines, medications, skincareProducts }: DayTileProps) {
+function DayTile({ dayLog, today, medicationGroups, skincareRoutines, medications, skincareProducts }: DayTileProps) {
   const { isDark } = useTheme();
 
   const { medFilled, skinFilled } = useMemo(
@@ -105,9 +106,17 @@ function DayTile({ dayLog, medicationGroups, skincareRoutines, medications, skin
   const hasSkinSide = skinFilled.length > 0;
   const hasBoth     = hasMedSide && hasSkinSide;
 
-  const tileColor   = isDark ? "#2B2B2B" : "#E8EAED";
-  const emptyBrick  = isDark ? "#3C3C3C" : "#D4D7DC";
-  const borderColor = isDark ? "#404040" : "#CDD0D5";
+  // Tiles strictly after today get a darker "locked" palette
+  const isFuture    = dayLog.date > today;
+  const tileColor   = isFuture
+    ? (isDark ? "#181818" : "#C4C8D0")
+    : (isDark ? "#2B2B2B" : "#E8EAED");
+  const emptyBrick  = isFuture
+    ? (isDark ? "#252525" : "#B0B5BE")
+    : (isDark ? "#3C3C3C" : "#D4D7DC");
+  const borderColor = isFuture
+    ? (isDark ? "#282828" : "#B8BCC4")
+    : (isDark ? "#404040" : "#CDD0D5");
 
   const renderColumn = (filled: boolean[], color: string) => (
     <View style={styles.column}>
@@ -148,6 +157,7 @@ type SlotProps = {
   animOffset: SharedValue<number>;
   containerHalfWidth: number;
   dayLog: DayLog;
+  today: string;
   medicationGroups: MedicationGroup[];
   skincareRoutines: SkincareRoutine[];
   medications: Medication[];
@@ -156,7 +166,7 @@ type SlotProps = {
 
 function AnimatedTileSlot({
   logicalPos, animOffset, containerHalfWidth,
-  dayLog, medicationGroups, skincareRoutines, medications, skincareProducts,
+  dayLog, today, medicationGroups, skincareRoutines, medications, skincareProducts,
 }: SlotProps) {
   const animStyle = useAnimatedStyle(() => {
     const visualPos = logicalPos + animOffset.value;
@@ -183,6 +193,7 @@ function AnimatedTileSlot({
     <Animated.View style={[styles.slotWrapper, animStyle]}>
       <DayTile
         dayLog={dayLog}
+        today={today}
         medicationGroups={medicationGroups}
         skincareRoutines={skincareRoutines}
         medications={medications}
@@ -278,6 +289,7 @@ export function DayTileCarousel({
             animOffset={animOffset}
             containerHalfWidth={containerHalfWidth}
             dayLog={getDayLog(offsetDate(viewingDate, pos))}
+            today={today}
             medicationGroups={medicationGroups}
             skincareRoutines={skincareRoutines}
             medications={medications}
