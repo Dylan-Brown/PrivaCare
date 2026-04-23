@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -44,6 +44,18 @@ import {
 } from "@/utils/healthKit";
 
 type ActionState = "idle" | "loading" | "success" | "error";
+
+const RECOGNIZED_SUBSTANCES = new Set([
+  "alcohol", "cannabis", "marijuana", "weed", "thc", "cbd",
+  "caffeine", "nicotine", "tobacco", "cigarettes", "vaping",
+  "cocaine", "crack", "heroin", "methamphetamine", "meth",
+  "amphetamine", "amphetamines", "adderall", "vyvanse",
+  "opioid", "opioids", "opiates", "morphine", "oxycodone", "fentanyl",
+  "codeine", "tramadol", "hydrocodone",
+  "benzodiazepines", "benzos", "xanax", "valium", "klonopin", "ativan",
+  "mdma", "ecstasy", "molly", "kratom", "mushrooms", "psilocybin",
+  "lsd", "acid", "ketamine", "dmt", "ritalin", "strattera",
+]);
 
 function RowItem({
   icon,
@@ -139,9 +151,29 @@ export default function SettingsScreen() {
   const { colorSchemeOverride, setColorSchemeOverride } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { medications, medicationGroups, skincareProducts, skincareRoutines, medicationLogs, skincareLogs, dayLogs, userProfile, setUserProfile, tempUnit, setTempUnit } = useApp();
-  const otherDrugsRef = useRef<TextInput>(null);
+  const [otherDrugInput, setOtherDrugInput] = useState("");
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+
+  const otherDrugTags = (userProfile.otherDrugs || "").split(",").map(s => s.trim()).filter(Boolean);
+
+  const addOtherDrugTag = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+    if (otherDrugTags.some(t => t.toLowerCase() === lower)) {
+      setOtherDrugInput("");
+      return;
+    }
+    const newTags = [...otherDrugTags, trimmed];
+    setUserProfile({ otherDrugs: newTags.join(", ") });
+    setOtherDrugInput("");
+  };
+
+  const removeOtherDrugTag = (tag: string) => {
+    const newTags = otherDrugTags.filter(t => t !== tag);
+    setUserProfile({ otherDrugs: newTags.join(", ") });
+  };
 
   const [exportState, setExportState] = useState<ActionState>("idle");
   const [pdfState, setPdfState] = useState<ActionState>("idle");
@@ -193,7 +225,19 @@ export default function SettingsScreen() {
   }, [hkEnabled]);
 
   const handlePdfExport = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (Platform.OS === "web") {
+      setPdfState("error");
+      setPdfMessage("PDF export requires the native iOS app. Use Export & Share for now.");
+      setTimeout(() => setPdfState("idle"), 4000);
+      return;
+    }
+    if (medications.length === 0 && skincareProducts.length === 0) {
+      setPdfState("error");
+      setPdfMessage("No medications or skincare products to include in the report.");
+      setTimeout(() => setPdfState("idle"), 4000);
+      return;
+    }
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     setPdfState("loading");
     const today = todayString();
     const medAdherence = buildMedAdherence(medications, dayLogs, today);
@@ -431,31 +475,6 @@ export default function SettingsScreen() {
         </>
       )}
 
-      <SectionHeader title="MEDICATIONS" />
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.rowItem, styles.rowItemLast]}>
-          <View style={[styles.rowIcon, { backgroundColor: `${colors.tint}20` }]}>
-            <Ionicons name="layers-outline" size={18} color={colors.tint} />
-          </View>
-          <View style={styles.rowText}>
-            <Text style={[styles.rowTitle, { color: colors.text }]}>Compound Medications</Text>
-            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
-              Allow adding compound medications (multiple active ingredients)
-            </Text>
-          </View>
-          <Switch
-            value={userProfile.compoundMedicationsEnabled ?? false}
-            onValueChange={v => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setUserProfile({ compoundMedicationsEnabled: v });
-            }}
-            trackColor={{ false: colors.border, true: colors.tint }}
-            thumbColor="#fff"
-            ios_backgroundColor={colors.border}
-          />
-        </View>
-      </View>
-
       <SectionHeader title="LIFESTYLE & INTERACTIONS" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={[styles.rowItem, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderLight }]}>
@@ -500,22 +519,64 @@ export default function SettingsScreen() {
             ios_backgroundColor={colors.border}
           />
         </View>
-        <View style={[styles.rowItem]}>
-          <View style={[styles.rowIcon, { backgroundColor: `${colors.accent}20` }]}>
-            <Ionicons name="ellipsis-horizontal-circle-outline" size={18} color={colors.accent} />
-          </View>
-          <View style={styles.rowText}>
+        <View style={[styles.rowItem, { alignItems: "flex-start", flexDirection: "column", gap: 10 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={[styles.rowIcon, { backgroundColor: `${colors.accent}20` }]}>
+              <Ionicons name="ellipsis-horizontal-circle-outline" size={18} color={colors.accent} />
+            </View>
             <Text style={[styles.rowTitle, { color: colors.text }]}>Other Substances</Text>
+          </View>
+          {otherDrugTags.length > 0 && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {otherDrugTags.map(tag => {
+                const recognized = RECOGNIZED_SUBSTANCES.has(tag.toLowerCase());
+                return (
+                  <Pressable
+                    key={tag}
+                    onPress={() => removeOtherDrugTag(tag)}
+                    style={{
+                      flexDirection: "row", alignItems: "center", gap: 4,
+                      paddingHorizontal: 10, paddingVertical: 5,
+                      borderRadius: 100, borderWidth: 1,
+                      backgroundColor: recognized ? `${colors.tint}18` : `${colors.accent}18`,
+                      borderColor: recognized ? `${colors.tint}50` : `${colors.accent}50`,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: recognized ? colors.tint : colors.accent }}>
+                      {tag}
+                    </Text>
+                    {!recognized && (
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.accent }}>?</Text>
+                    )}
+                    <Ionicons name="close" size={13} color={recognized ? colors.tint : colors.accent} />
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, width: "100%" }}>
             <TextInput
-              ref={otherDrugsRef}
-              style={[styles.otherDrugsInput, { color: colors.text, borderColor: colors.border }]}
-              placeholder="e.g. cannabis, caffeine, supplements…"
+              style={[styles.otherDrugsInput, { flex: 1, color: colors.text, borderColor: colors.border }]}
+              placeholder="Type and press + or comma to add…"
               placeholderTextColor={colors.textTertiary}
-              value={userProfile.otherDrugs}
-              onChangeText={t => setUserProfile({ otherDrugs: t })}
+              value={otherDrugInput}
+              onChangeText={v => {
+                if (v.endsWith(",")) {
+                  addOtherDrugTag(v.slice(0, -1));
+                } else {
+                  setOtherDrugInput(v);
+                }
+              }}
+              onSubmitEditing={() => addOtherDrugTag(otherDrugInput)}
               returnKeyType="done"
-              multiline={false}
+              blurOnSubmit={false}
             />
+            <Pressable
+              onPress={() => addOtherDrugTag(otherDrugInput)}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.tint, alignItems: "center", justifyContent: "center" }}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </Pressable>
           </View>
         </View>
       </View>
@@ -525,6 +586,31 @@ export default function SettingsScreen() {
           These flags are used only to check drug interactions on the Medications screen. Your data never leaves this device. Interaction data is sourced from the free{" "}
           <Text style={{ fontFamily: "Inter_600SemiBold" }}>NIH RxNorm API</Text>.
         </Text>
+      </View>
+
+      <SectionHeader title="MEDICATIONS" />
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.rowItem, styles.rowItemLast]}>
+          <View style={[styles.rowIcon, { backgroundColor: `${colors.tint}20` }]}>
+            <Ionicons name="layers-outline" size={18} color={colors.tint} />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Compound Medications</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>
+              Allow adding compound medications (multiple active ingredients)
+            </Text>
+          </View>
+          <Switch
+            value={userProfile.compoundMedicationsEnabled ?? false}
+            onValueChange={v => {
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+              setUserProfile({ compoundMedicationsEnabled: v });
+            }}
+            trackColor={{ false: colors.border, true: colors.tint }}
+            thumbColor="#fff"
+            ios_backgroundColor={colors.border}
+          />
+        </View>
       </View>
 
       <SectionHeader title="YOUR DATA" />
@@ -553,28 +639,22 @@ export default function SettingsScreen() {
         />
       </View>
 
-      <SectionHeader title="REPORTS" />
+      <SectionHeader title="BACKUP & RESTORE" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <RowItem
           icon="document-text-outline"
           iconColor="#A78BFA"
           iconBg="#A78BFA18"
           title="Export Health Report (PDF)"
-          subtitle="Generates a PDF with adherence stats, medication and skincare details"
+          subtitle="PDF with adherence stats, medications and skincare details"
           onPress={pdfState === "loading" ? undefined : handlePdfExport}
           disabled={pdfState === "loading"}
-          last
           trailing={
             pdfState === "loading" ? (
               <ActivityIndicator size="small" color="#A78BFA" />
             ) : undefined
           }
         />
-      </View>
-      <StatusBanner state={pdfState} message={pdfMessage} />
-
-      <SectionHeader title="BACKUP & RESTORE" />
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {Platform.OS !== "web" && (
           <RowItem
             icon="folder"
@@ -622,6 +702,7 @@ export default function SettingsScreen() {
         />
       </View>
 
+      <StatusBanner state={pdfState} message={pdfMessage} />
       <StatusBanner state={saveState} message={saveMessage} />
       <StatusBanner state={exportState} message={exportMessage} />
       <StatusBanner state={importState} message={importMessage} />
