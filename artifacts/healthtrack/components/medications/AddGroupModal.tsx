@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,7 +19,7 @@ import { MedicationGroup, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 
 const COLORS = ["#34C78B", "#FF6B6B", "#007AFF", "#FF9F0A", "#AF52DE", "#FF6CBF", "#5AC8FA", "#4CD964"];
-const TIME_LABELS = ["Morning", "Afternoon", "Evening", "Bedtime", "With meals", "Custom"];
+const PRESET_TIMES = ["Morning", "Afternoon", "Evening", "Bedtime", "With meals", "Custom"];
 
 type Props = {
   visible: boolean;
@@ -27,15 +27,45 @@ type Props = {
   editGroup?: MedicationGroup | null;
 };
 
+function clampToThreeWords(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, 3).join(" ");
+}
+
 export function AddGroupModal({ visible, onClose, editGroup }: Props) {
   const { colors } = useTheme();
   const { medications, addMedicationGroup, updateMedicationGroup } = useApp();
   const insets = useSafeAreaInsets();
 
-  const [name, setName] = useState(editGroup?.name || "");
-  const [timeLabel, setTimeLabel] = useState(editGroup?.timeLabel || "Morning");
-  const [selectedMeds, setSelectedMeds] = useState<string[]>(editGroup?.medicationIds || []);
-  const [selectedColor, setSelectedColor] = useState(editGroup?.color || COLORS[0]);
+  const [name, setName] = useState("");
+  const [timeLabel, setTimeLabel] = useState("Morning");
+  const [customTime, setCustomTime] = useState("");
+  const [selectedMeds, setSelectedMeds] = useState<string[]>([]);
+  const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+
+  useEffect(() => {
+    if (visible) {
+      if (editGroup) {
+        setName(editGroup.name);
+        const isPreset = PRESET_TIMES.slice(0, -1).includes(editGroup.timeLabel);
+        if (isPreset) {
+          setTimeLabel(editGroup.timeLabel);
+          setCustomTime("");
+        } else {
+          setTimeLabel("Custom");
+          setCustomTime(editGroup.timeLabel);
+        }
+        setSelectedMeds(editGroup.medicationIds);
+        setSelectedColor(editGroup.color || COLORS[0]);
+      } else {
+        setName("");
+        setTimeLabel("Morning");
+        setCustomTime("");
+        setSelectedMeds([]);
+        setSelectedColor(COLORS[0]);
+      }
+    }
+  }, [visible]);
 
   const toggleMed = (id: string) => {
     setSelectedMeds(prev =>
@@ -43,12 +73,19 @@ export function AddGroupModal({ visible, onClose, editGroup }: Props) {
     );
   };
 
-  const reset = () => {
-    if (!editGroup) {
-      setName(""); setTimeLabel("Morning");
-      setSelectedMeds([]); setSelectedColor(COLORS[0]);
+  const handleCustomTimeChange = (text: string) => {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length <= 3) {
+      setCustomTime(text);
+    } else {
+      setCustomTime(words.slice(0, 3).join(" "));
     }
   };
+
+  const resolvedTimeLabel =
+    timeLabel === "Custom"
+      ? (customTime.trim() || "Custom")
+      : timeLabel;
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -59,17 +96,26 @@ export function AddGroupModal({ visible, onClose, editGroup }: Props) {
       Alert.alert("Required", "Please select at least one medication.");
       return;
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (timeLabel === "Custom" && !customTime.trim()) {
+      Alert.alert("Required", "Please enter a custom time label.");
+      return;
+    }
+    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     if (editGroup) {
       await updateMedicationGroup(editGroup.id, {
-        name: name.trim(), timeLabel, medicationIds: selectedMeds, color: selectedColor,
+        name: name.trim(),
+        timeLabel: resolvedTimeLabel,
+        medicationIds: selectedMeds,
+        color: selectedColor,
       });
     } else {
       await addMedicationGroup({
-        name: name.trim(), timeLabel, medicationIds: selectedMeds, color: selectedColor,
+        name: name.trim(),
+        timeLabel: resolvedTimeLabel,
+        medicationIds: selectedMeds,
+        color: selectedColor,
       });
     }
-    reset();
     onClose();
   };
 
@@ -111,7 +157,7 @@ export function AddGroupModal({ visible, onClose, editGroup }: Props) {
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>TIME</Text>
             <View style={styles.chipGrid}>
-              {TIME_LABELS.map(t => (
+              {PRESET_TIMES.map(t => (
                 <Pressable
                   key={t}
                   onPress={() => setTimeLabel(t)}
@@ -129,6 +175,27 @@ export function AddGroupModal({ visible, onClose, editGroup }: Props) {
                 </Pressable>
               ))}
             </View>
+
+            {timeLabel === "Custom" && (
+              <View style={[styles.customInputRow, { borderTopColor: colors.border }]}>
+                <TextInput
+                  style={[styles.customInput, {
+                    color: colors.text,
+                    backgroundColor: colors.borderLight,
+                    borderColor: colors.border,
+                  }]}
+                  placeholder="Up to 3 words (e.g. Post Workout)"
+                  placeholderTextColor={colors.textTertiary}
+                  value={customTime}
+                  onChangeText={handleCustomTimeChange}
+                  maxLength={40}
+                  returnKeyType="done"
+                />
+                <Text style={[styles.wordCount, { color: colors.textTertiary }]}>
+                  {customTime.trim() ? customTime.trim().split(/\s+/).filter(Boolean).length : 0}/3 words
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -205,6 +272,13 @@ const styles = StyleSheet.create({
   chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, borderWidth: 1 },
   chipText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  customInputRow: { marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
+  customInput: {
+    fontSize: 15, fontFamily: "Inter_400Regular",
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 12, borderWidth: 1,
+  },
+  wordCount: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right", marginTop: 4 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", fontStyle: "italic" },
   medRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
