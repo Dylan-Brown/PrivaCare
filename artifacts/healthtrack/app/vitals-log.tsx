@@ -55,7 +55,7 @@ const METRICS: MetricConfig[] = [
     icon: "thermometer-outline",
     color: "#FF9F0A",
     unit: (u) => `°${u}`,
-    normalLabel: (u) => u === "F" ? "Normal: 97.6–99.6°F" : "Normal: 36.4–37.6°C",
+    normalLabel: (u) => u === "F" ? "Normal: 97–99°F" : "Normal: 36.1–37.2°C",
     placeholder: (u) => u === "F" ? "e.g. 98.6" : "e.g. 37.0",
   },
   {
@@ -64,7 +64,7 @@ const METRICS: MetricConfig[] = [
     icon: "thermometer-outline",
     color: "#AF52DE",
     unit: (u) => `°${u}`,
-    normalLabel: (u) => u === "F" ? "Normal: 97.9–99.0°F" : "Normal: 36.6–37.2°C",
+    normalLabel: (u) => u === "F" ? "Normal: 97–99°F" : "Normal: 36.1–37.2°C",
     placeholder: (u) => u === "F" ? "e.g. 98.4" : "e.g. 36.9",
   },
 ];

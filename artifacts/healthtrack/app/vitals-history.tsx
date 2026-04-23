@@ -390,6 +390,14 @@ export default function VitalsHistoryScreen() {
 
   const { windowStart, windowEnd } = useMemo(() => {
     const days = RANGES.find(r => r.key === range)!.days;
+    if (range === "1D") {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      todayStart.setDate(todayStart.getDate() - windowOffset);
+      const dayEnd = new Date(todayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+      return { windowStart: todayStart, windowEnd: dayEnd };
+    }
     const end = new Date(Date.now() - windowOffset * days * 24 * 60 * 60 * 1000);
     const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
     return { windowStart: start, windowEnd: end };
