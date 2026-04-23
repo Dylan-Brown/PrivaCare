@@ -137,7 +137,7 @@ export async function saveVitalToHealthKit(reading: {
         at,
         {
           HKMetadataKeyBodyTemperatureSensorLocation:
-            reading.type === "TempOral" ? 1 : 0,
+            reading.type === "TempOral" ? 1 : 6,
         }
       );
     } else if (
