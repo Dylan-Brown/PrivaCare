@@ -216,14 +216,23 @@ function MetricSection({
     [readings]
   );
 
+  const toDisplayValue = useCallback((r: ScalarReading): number => {
+    if (!isTemp) return r.value;
+    const storedInCelsius = r.unit.includes("C");
+    const displayInCelsius = tempUnit === "C";
+    if (storedInCelsius === displayInCelsius) return r.value;
+    if (storedInCelsius && !displayInCelsius) return r.value * 9 / 5 + 32;
+    return (r.value - 32) * 5 / 9;
+  }, [isTemp, tempUnit]);
+
   const scalarData = useMemo(() => {
     if (metric.isBP) return null;
     return chronologicalReadings.filter(isScalarReading).map(r => ({
-      value: r.value,
+      value: toDisplayValue(r),
       label: formatXLabel(r.timestamp, range),
       timestamp: r.timestamp,
     }));
-  }, [chronologicalReadings, range, metric.isBP]);
+  }, [chronologicalReadings, range, metric.isBP, toDisplayValue]);
 
   const systolicData = useMemo(() => {
     if (!metric.isBP) return null;
