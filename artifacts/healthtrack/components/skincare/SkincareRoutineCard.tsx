@@ -18,6 +18,7 @@ import Animated, {
 import { SkincareRoutine, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 import { SkincareProductCard } from "./SkincareProductCard";
+import { todayString, toDateString } from "@/utils/scheduleCompute";
 
 type Props = {
   routine: SkincareRoutine;
@@ -26,13 +27,14 @@ type Props = {
 
 export function SkincareRoutineCard({ routine, onEdit }: Props) {
   const { colors } = useTheme();
-  const { skincareProducts, logSkincareRoutine, getTodaySkincareLogs } = useApp();
+  const { skincareProducts, skincareLogs, logSkincareRoutine } = useApp();
   const [logging, setLogging] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const scale = useSharedValue(1);
 
   const routineProducts = skincareProducts.filter(p => routine.productIds.includes(p.id));
-  const todayLogs = getTodaySkincareLogs();
+  const today = todayString();
+  const todayLogs = skincareLogs.filter(l => toDateString(new Date(l.loggedAt)) === today);
   const loggedIds = new Set(todayLogs.filter(l => l.routineId === routine.id).map(l => l.productId));
   const allLogged = routineProducts.length > 0 && routineProducts.every(p => loggedIds.has(p.id));
 

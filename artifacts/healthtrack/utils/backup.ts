@@ -3,20 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import { Platform } from "react-native";
-
-const STORAGE_KEYS = {
-  MEDICATIONS: "@healthtrack_medications",
-  MED_GROUPS: "@healthtrack_med_groups",
-  MED_LOGS: "@healthtrack_med_logs",
-  SKINCARE_PRODUCTS: "@healthtrack_skincare_products",
-  SKINCARE_ROUTINES: "@healthtrack_skincare_routines",
-  SKINCARE_LOGS: "@healthtrack_skincare_logs",
-  DAY_LOGS: "@vital_day_logs",
-  USER_PROFILE: "@vital_user_profile",
-  NOTIFICATIONS: "@vital_notifications",
-  VITAL_READINGS: "@privacre_vital_readings",
-  TEMP_UNIT: "@privacre_temp_unit",
-};
+import { STORAGE_KEYS } from "@/utils/storageKeys";
 
 const APP_NAME = "PrivaCare";
 

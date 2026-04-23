@@ -1,0 +1,15 @@
+export const STORAGE_KEYS = {
+  MEDICATIONS: "@healthtrack_medications",
+  MED_GROUPS: "@healthtrack_med_groups",
+  MED_LOGS: "@healthtrack_med_logs",
+  SKINCARE_PRODUCTS: "@healthtrack_skincare_products",
+  SKINCARE_ROUTINES: "@healthtrack_skincare_routines",
+  SKINCARE_LOGS: "@healthtrack_skincare_logs",
+  USER_PROFILE: "@vital_user_profile",
+  DAY_LOGS: "@vital_day_logs",
+  NOTIFICATIONS: "@vital_notifications",
+  INSIGHTS_WEEKLY: "@vital_insights_last_weekly",
+  INSIGHTS_MONTHLY: "@vital_insights_last_monthly",
+  VITAL_READINGS: "@privacre_vital_readings",
+  TEMP_UNIT: "@privacre_temp_unit",
+};

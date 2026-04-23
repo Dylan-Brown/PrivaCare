@@ -18,6 +18,7 @@ import Animated, {
 import { MedicationGroup, useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 import { MedicationCard } from "./MedicationCard";
+import { todayString, toDateString } from "@/utils/scheduleCompute";
 
 type Props = {
   group: MedicationGroup;
@@ -26,13 +27,14 @@ type Props = {
 
 export function MedicationGroupCard({ group, onEdit }: Props) {
   const { colors } = useTheme();
-  const { medications, logMedicationGroup, getTodayMedLogs } = useApp();
+  const { medications, medicationLogs, logMedicationGroup } = useApp();
   const [logging, setLogging] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const scale = useSharedValue(1);
 
   const groupMeds = medications.filter(m => group.medicationIds.includes(m.id));
-  const todayLogs = getTodayMedLogs();
+  const today = todayString();
+  const todayLogs = medicationLogs.filter(l => toDateString(new Date(l.takenAt)) === today);
   const loggedIds = new Set(todayLogs.filter(l => l.groupId === group.id).map(l => l.medicationId));
   const allLogged = groupMeds.length > 0 && groupMeds.every(m => loggedIds.has(m.id));
 
