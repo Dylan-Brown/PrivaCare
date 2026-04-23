@@ -91,17 +91,17 @@ const METRICS: MetricDef[] = [
     label: "Oral Temperature",
     icon: "thermometer-outline",
     color: "#FF9F0A",
-    normalMin: 97.6,
-    normalMax: 99.6,
-    normalMinC: 36.4,
-    normalMaxC: 37.6,
+    normalMin: 97,
+    normalMax: 99,
+    normalMinC: 36.1,
+    normalMaxC: 37.2,
     yMin: 95,
     yMax: 104,
     yMinC: 35,
     yMaxC: 40,
     unit: (u) => `°${u}`,
-    formatValue: (r, u) => {
-      if (isScalarReading(r)) return `${r.value}°${u}`;
+    formatValue: (r) => {
+      if (isScalarReading(r)) return `${r.value}${r.unit}`;
       return "";
     },
   },
@@ -110,17 +110,17 @@ const METRICS: MetricDef[] = [
     label: "Forehead Temperature",
     icon: "thermometer-outline",
     color: "#AF52DE",
-    normalMin: 97.9,
-    normalMax: 99.0,
-    normalMinC: 36.6,
+    normalMin: 97,
+    normalMax: 99,
+    normalMinC: 36.1,
     normalMaxC: 37.2,
     yMin: 95,
     yMax: 104,
     yMinC: 35,
     yMaxC: 40,
     unit: (u) => `°${u}`,
-    formatValue: (r, u) => {
-      if (isScalarReading(r)) return `${r.value}°${u}`;
+    formatValue: (r) => {
+      if (isScalarReading(r)) return `${r.value}${r.unit}`;
       return "";
     },
   },
@@ -171,10 +171,13 @@ function formatFullDateTime(ts: string): string {
   });
 }
 
-function isReadingOutOfRange(r: VitalReading, normalMin?: number, normalMax?: number): boolean {
+function isReadingOutOfRange(r: VitalReading, metric: MetricDef): boolean {
   if (isScalarReading(r)) {
-    return (normalMin !== undefined && r.value < normalMin) ||
-           (normalMax !== undefined && r.value > normalMax);
+    const isTemp = metric.type === "TempOral" || metric.type === "TempForehead";
+    const isCelsius = isTemp && r.unit.includes("C");
+    const min = isTemp ? (isCelsius ? metric.normalMinC : metric.normalMin) : metric.normalMin;
+    const max = isTemp ? (isCelsius ? metric.normalMaxC : metric.normalMax) : metric.normalMax;
+    return (min !== undefined && r.value < min) || (max !== undefined && r.value > max);
   }
   if (isBPReading(r)) {
     return r.value.systolic > 120 || r.value.systolic < 90 ||
@@ -329,7 +332,7 @@ function MetricSection({
           <Text style={[styles.readingsTitle, { color: colors.textSecondary }]}>Readings</Text>
           {readings.slice(0, 10).map(r => {
             const display = metric.formatValue(r, tempUnit);
-            const outOfRange = isReadingOutOfRange(r, normalMin, normalMax);
+            const outOfRange = isReadingOutOfRange(r, metric);
             return (
               <View
                 key={r.id}
