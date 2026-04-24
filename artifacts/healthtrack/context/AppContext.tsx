@@ -466,11 +466,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Walk backwards from today through dayLogs to compute the current streak.
     // Days with no entries are transparent (neither count nor break the streak).
-    // We stop when we hit a day with entries that are not all complete.
+    // We stop when we hit a day with entries that are not all complete,
+    // or after MAX_CONSECUTIVE_EMPTY consecutive empty days while streak is still 0
+    // (prevents an O(400) scan on fresh installs with no data).
     let newCount = 0;
     let newLastCompleted = "";
     let offset = 0;
+    let consecutiveEmpty = 0;
     const MAX_DAYS_BACK = 400;
+    const MAX_EMPTY_WITHOUT_STREAK = 14; // give up after 14 empty days when streak=0
 
     while (offset <= MAX_DAYS_BACK) {
       const dateStr = offsetDateString(today, offset);
@@ -478,12 +482,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (!log || log.entries.length === 0) {
         // No scheduled items — transparent day.
-        // If we haven't found any completed day yet (still looking at today/recent), continue.
-        // But if we already passed the most recent completed day, stop.
-        if (newCount > 0) break;
+        if (newCount > 0) break; // already past the streak, stop
+        consecutiveEmpty++;
+        if (consecutiveEmpty > MAX_EMPTY_WITHOUT_STREAK) break; // no streak found, stop early
         offset++;
         continue;
       }
+
+      consecutiveEmpty = 0;
 
       if (isDayComplete(log)) {
         newCount++;
@@ -491,10 +497,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         offset++;
       } else {
         // This day had entries but wasn't complete — streak breaks here.
-        // Exception: if this is today and it's still in progress, don't break the streak —
-        // just don't count today.
+        // Exception: if this is today and it's still in progress, skip it.
         if (offset === 0) {
-          // Today is incomplete — that's fine, just skip today and keep scanning yesterday.
           offset++;
           continue;
         }
