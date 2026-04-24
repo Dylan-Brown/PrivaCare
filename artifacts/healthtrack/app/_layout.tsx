@@ -136,14 +136,23 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  // Allow a 3-second timeout so a slow/hanging Google Fonts CDN request
+  // never leaves the screen permanently blank.
+  const [timedOut, setTimedOut] = useState(false);
+  const fontsReady = fontsLoaded || !!fontError || timedOut;
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    const t = setTimeout(() => setTimedOut(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (fontsReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsReady]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsReady) return null;
 
   return (
     <ThemeProvider>
