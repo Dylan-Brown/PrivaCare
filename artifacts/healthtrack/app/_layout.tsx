@@ -136,13 +136,14 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
-  // Allow a 3-second timeout so a slow/hanging Google Fonts CDN request
-  // never leaves the screen permanently blank.
+  // Render with system-font fallback after 600ms so a slow/hanging Google
+  // Fonts CDN request never leaves the screen blank for long. The custom
+  // fonts will swap in seamlessly once they finish loading.
   const [timedOut, setTimedOut] = useState(false);
   const fontsReady = fontsLoaded || !!fontError || timedOut;
 
   useEffect(() => {
-    const t = setTimeout(() => setTimedOut(true), 3000);
+    const t = setTimeout(() => setTimedOut(true), 600);
     return () => clearTimeout(t);
   }, []);
 
