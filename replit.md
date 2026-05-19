@@ -83,8 +83,8 @@ An iOS-first personal health tracking app built with Expo React Native.
 - Toggle-expand notes in GroupDetailModal
 
 #### Medical Disclaimers
-- First add of day: usage disclaimer alert (stored date in `@vital_disclaimer_date`)
-- Second item ever (combined med+skincare): drug interaction disclosure alert (one-time, `@vital_interaction_disclosure_shown`)
+- First add of day: usage disclaimer alert (stored date in `@privacre_disclaimer_date`)
+- Second item ever (combined med+skincare): drug interaction disclosure alert (one-time, `@privacre_interaction_disclosure_shown`)
 
 #### Low Stock Alerts
 - Configurable refill threshold; refill banner on Today screen
@@ -94,7 +94,7 @@ An iOS-first personal health tracking app built with Expo React Native.
 
 #### Push Notifications
 - `utils/pushNotifications.ts` — schedules daily notifications per time slot using `expo-notifications`
-- Identifier prefix `vital_sch_` — ONE notification per unique scheduled time, listing all items due
+- Identifier prefix `privacre_sch_` — ONE notification per unique scheduled time, listing all items due
 - Auto-reschedules (debounced 1.5s) whenever medications or skincare products change (AppContext effect)
 - `requestNotificationPermissions()` called on app launch in `_layout.tsx`
 - Notification tap navigates to Today tab
@@ -124,7 +124,7 @@ An iOS-first personal health tracking app built with Expo React Native.
 - `hooks/useTheme.ts` now re-exports `useThemeContext()` for backward compatibility
 
 #### Welcome Onboarding Modal
-- `components/onboarding/WelcomeModal.tsx` — shown on first launch only (key `@vital_welcome_shown`)
+- `components/onboarding/WelcomeModal.tsx` — shown on first launch only (key `@privacre_welcome_shown`)
 - 6 swipeable cards: Welcome to PrivaCare, Today Timeline, Medications, Skincare, Reminders, 100% Private
 - Dot navigation, Next/Get Started button, Skip shortcut
 - Privacy-focused last card
@@ -145,7 +145,7 @@ An iOS-first personal health tracking app built with Expo React Native.
 - `DayLog` keyed by `"YYYY-MM-DD"`: `{ date, entries: DayLogEntry[], reactionNotes: SkincareReactionNote[] }`
 - `DayLogEntry`: `{ id, itemId, itemName, itemType, scheduledTime, isComplete, completedAt? }`
 - `SkincareProductStatus`: `"active" | "storage" | "history"`
-- Storage keys: `@vital_day_logs`, `@vital_notifications`, `@vital_disclaimer_date`, `@vital_interaction_disclosure_shown`, `@vital_insights_last_weekly`, `@vital_insights_last_monthly`, `@vital_welcome_shown`, `@vital_healthkit_prompted`, `@privacre_theme`
+- Storage keys: `@privacre_day_logs`, `@privacre_notifications`, `@privacre_disclaimer_date`, `@privacre_interaction_disclosure_shown`, `@privacre_insights_last_weekly`, `@privacre_insights_last_monthly`, `@privacre_welcome_shown`, `@privacre_healthkit_prompted`, `@privacre_theme`
 
 ### Utilities
 - `utils/scheduleCompute.ts` — `shouldAppearOnDate()`, `formatTime()`, `formatNavDate()`, `todayString()`, `toDateString()`, `isDateExpired()`, `isDateExpiringSoon()`

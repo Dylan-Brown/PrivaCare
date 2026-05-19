@@ -123,7 +123,7 @@ export async function listBackups(): Promise<string[]> {
     if (!docDir) return [];
     const files = await FileSystem.readDirectoryAsync(docDir);
     return files
-      .filter(f => (f.startsWith("privacre-backup-") || f.startsWith("vital-backup-")) && f.endsWith(".json"))
+      .filter(f => f.startsWith("privacre-backup-") && f.endsWith(".json"))
       .sort()
       .reverse();
   } catch {

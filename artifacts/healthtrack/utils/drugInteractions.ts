@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const RXNORM_BASE = "https://rxnav.nlm.nih.gov/REST";
-const RXCUI_CACHE_KEY = "@vital_rxcui_cache";
+const RXCUI_CACHE_KEY = "@privacre_rxcui_cache";
 
 const SUBSTANCE_RXCUIS: Record<string, { rxcui: string; label: string }> = {
   alcohol: { rxcui: "3498", label: "Alcohol" },

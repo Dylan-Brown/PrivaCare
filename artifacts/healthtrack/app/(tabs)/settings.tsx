@@ -712,7 +712,7 @@ export default function SettingsScreen() {
           <SectionHeader title={`SAVED BACKUPS (${savedBackups.length})`} />
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {savedBackups.map((filename, i) => {
-              const datePart = filename.replace("vital-backup-", "").replace(".json", "");
+              const datePart = filename.replace("privacre-backup-", "").replace(".json", "");
               return (
                 <RowItem
                   key={filename}
