@@ -2,18 +2,18 @@
 
 ---
 
-# Vital — Private Health Tracker
+# PrivaCare — Private Health Tracker
 
 > **Your health data belongs to you — and only you.**
 > No account. No cloud. No tracking. Everything stays on your device, always.
 
-**Vital** is an iOS-first personal health tracking app built with Expo React Native. It helps you stay consistent with medications and skincare routines through smart scheduling, adherence tracking, and daily push reminders — with a hard privacy guarantee: **not one byte of your health data ever leaves your device.**
+**PrivaCare** is an iOS-first personal health tracking app built with Expo React Native. It helps you stay consistent with medications and skincare routines through smart scheduling, adherence tracking, and daily push reminders — with a hard privacy guarantee: **not one byte of your health data ever leaves your device.**
 
 ---
 
 ## Contents
 
-- [Why Vital](#why-vital)
+- [Why PrivaCare](#why-privacare)
 - [Privacy by Design](#privacy-by-design)
 - [Features](#features)
   - [Today Timeline](#today-timeline)
@@ -28,7 +28,7 @@
 
 ---
 
-## Why Vital
+## Why PrivaCare
 
 Health data is among the most sensitive information about a person. Despite this, most health apps treat it as a product:
 
@@ -37,7 +37,7 @@ Health data is among the most sensitive information about a person. Despite this
 - They sell anonymised (or not-so-anonymised) data to advertisers, insurers, or research partners
 - They can be subpoenaed, breached, or shut down
 
-Vital is built on a different premise: **the app is a tool, not a service.** It runs entirely on your phone. There is no backend server, no user database, no analytics SDK, and no way for anyone other than you to access what you log.
+PrivaCare is built on a different premise: **the app is a tool, not a service.** It runs entirely on your phone. There is no backend server, no user database, no analytics SDK, and no way for anyone other than you to access what you log.
 
 The tracking goal is simple — help you actually take your medications and follow your skincare routine, and give you honest, private feedback on how well you're doing.
 
@@ -45,9 +45,9 @@ The tracking goal is simple — help you actually take your medications and foll
 
 ## Privacy by Design
 
-Privacy in Vital is not a setting you toggle. It is the architecture.
+Privacy in PrivaCare is not a setting you toggle. It is the architecture.
 
-| What other apps do | What Vital does |
+| What other apps do | What PrivaCare does |
 |--------------------|-----------------|
 | Require account creation | No account, ever |
 | Sync data to the cloud | All data stays on-device in AsyncStorage |
@@ -56,9 +56,9 @@ Privacy in Vital is not a setting you toggle. It is the architecture.
 | Risk exposure via data breach | Nothing to breach — no server, no database |
 | Query external APIs with identifiable data | Drug interaction checks use only generic drug names, no identifiers |
 
-**The only outbound network request Vital makes** is an anonymous query to the NIH OpenFDA drug interaction API — using only the generic names of your medications, with no device ID, no account token, and no other metadata attached. You can verify this by inspecting the network tab.
+**The only outbound network request PrivaCare makes** is an anonymous query to the NIH OpenFDA drug interaction API — using only the generic names of your medications, with no device ID, no account token, and no other metadata attached. You can verify this by inspecting the network tab.
 
-**Backup & Restore** — you are in full control of your data. You can export a complete JSON backup at any time from Settings and restore it on any device running Vital. Your backup file goes wherever you send it — no upload required.
+**Backup & Restore** — you are in full control of your data. You can export a complete JSON backup at any time from Settings and restore it on any device running PrivaCare. Your backup file goes wherever you send it — no upload required.
 
 ---
 
@@ -128,7 +128,7 @@ Track every product in your routine with the same scheduling system as medicatio
 **Products:**
 
 - Name, brand, product type (moisturiser, serum, SPF, etc.)
-- Expiry date (month + year) — Vital warns you when a product is expiring soon or has expired
+- Expiry date (month + year) — PrivaCare warns you when a product is expiring soon or has expired
 - Free-text notes for tracking how your skin responds
 - Schedule (daily, every other day, etc.) and time slots
 
@@ -151,7 +151,7 @@ Track every product in your routine with the same scheduling system as medicatio
 
 ### Drug Interaction Checker
 
-When you open the Medications tab with two or more active medications, Vital automatically queries the **NIH OpenFDA drug interaction API** to check for known interactions.
+When you open the Medications tab with two or more active medications, PrivaCare automatically queries the **NIH OpenFDA drug interaction API** to check for known interactions.
 
 - Results show as a banner below the medication list — green for no known interactions, amber or red for warnings
 - Lifestyle factors included in checks: alcohol, tobacco/nicotine, and custom substances (cannabis, caffeine, supplements) configured in Settings
@@ -198,7 +198,7 @@ Switch between **Medications** and **Skincare** with the tab picker at the top.
 
 ### Push Notifications
 
-Vital schedules daily reminders for every time slot that has scheduled items. Notifications are updated automatically any time you add, edit, or remove a medication or skincare product (with a short debounce to batch changes together).
+PrivaCare schedules daily reminders for every time slot that has scheduled items. Notifications are updated automatically any time you add, edit, or remove a medication or skincare product (with a short debounce to batch changes together).
 
 - One notification per unique time slot, listing all items due at that time
 - Tapping a notification opens the Today tab
@@ -206,7 +206,7 @@ Vital schedules daily reminders for every time slot that has scheduled items. No
 
 **Example notification:**
 ```
-Vital — 8:00 AM
+PrivaCare — 8:00 AM
 Time for Metformin 500 mg, Vitamin D 1000 IU, and Niacinamide Serum
 ```
 
@@ -214,7 +214,7 @@ Time for Metformin 500 mg, Vitamin D 1000 IU, and Niacinamide Serum
 
 ### PDF Health Report
 
-From **Settings → Reports → Export Health Report (PDF)**, Vital generates a shareable PDF snapshot of your health data.
+From **Settings → Reports → Export Health Report (PDF)**, PrivaCare generates a shareable PDF snapshot of your health data.
 
 <img src="screenshots/settings.jpg" width="320" alt="Settings tab">
 
@@ -243,7 +243,7 @@ The file is shared via the native iOS share sheet so you can send it to your doc
 
 ```bash
 git clone <repo-url>
-cd vital
+cd privacare
 pnpm install
 ```
 
@@ -284,4 +284,4 @@ This runs 21 unit tests covering the schedule computation and adherence calculat
 
 ---
 
-*Vital is a personal project. It is not a medical device and should not replace professional medical advice. Always consult a qualified healthcare provider before making changes to your medications or treatment plan.*
+*PrivaCare is a personal project. It is not a medical device and should not replace professional medical advice. Always consult a qualified healthcare provider before making changes to your medications or treatment plan.*

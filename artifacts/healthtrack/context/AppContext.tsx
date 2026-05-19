@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { logMedicationDoseToHealthKit, saveVitalToHealthKit } from "@/utils/healthKit";
-import { scheduleAllVitalNotifications } from "@/utils/pushNotifications";
+import { scheduleAllPrivaCareNotifications } from "@/utils/pushNotifications";
 import { UserProfile } from "@/utils/drugInteractions";
 import {
   ItemSchedule,
@@ -395,7 +395,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
     if (notifDebounce.current) clearTimeout(notifDebounce.current);
     notifDebounce.current = setTimeout(() => {
-      scheduleAllVitalNotifications(medications, skincareProducts).catch(() => {});
+      scheduleAllPrivaCareNotifications(medications, skincareProducts).catch(() => {});
     }, 1500);
     return () => { if (notifDebounce.current) clearTimeout(notifDebounce.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps

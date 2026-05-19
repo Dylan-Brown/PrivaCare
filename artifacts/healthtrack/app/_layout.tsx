@@ -26,8 +26,8 @@ import { trackAppOpen, recordDonationShown } from "@/utils/appTracking";
 import { isHealthKitAvailable } from "@/utils/healthKit";
 import { requestNotificationPermissions } from "@/utils/pushNotifications";
 
-const HK_PROMPTED_KEY = "@vital_healthkit_prompted";
-const WELCOME_SHOWN_KEY = "@vital_welcome_shown";
+const HK_PROMPTED_KEY = "@privacre_healthkit_prompted";
+const WELCOME_SHOWN_KEY = "@privacre_welcome_shown";
 
 SplashScreen.preventAutoHideAsync();
 

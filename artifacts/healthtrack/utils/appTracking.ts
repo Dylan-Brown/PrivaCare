@@ -1,10 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const KEYS = {
-  FIRST_OPEN_DATE:      "@vital_first_open_date",
-  OPEN_COUNT:           "@vital_open_count",
-  LAST_DONATION_SHOWN:  "@vital_last_donation_shown",
-  DONATION_SHOWN_COUNT: "@vital_donation_shown_count",
+  FIRST_OPEN_DATE:      "@privacre_first_open_date",
+  OPEN_COUNT:           "@privacre_open_count",
+  LAST_DONATION_SHOWN:  "@privacre_last_donation_shown",
+  DONATION_SHOWN_COUNT: "@privacre_donation_shown_count",
 };
 
 function daysBetween(a: Date, b: Date): number {

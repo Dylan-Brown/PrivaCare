@@ -14,12 +14,12 @@ if (Platform.OS !== "web") {
   });
 }
 
-const PREFIX = "vital_sch_";
+const PREFIX = "privacre_sch_";
 
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (Platform.OS === "web") return false;
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("vital_reminders", {
+    await Notifications.setNotificationChannelAsync("privacre_reminders", {
       name: "Health Reminders",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
@@ -46,7 +46,7 @@ function joinNames(names: string[]): string {
   return `${names[0]}, ${names[1]} & ${names.length - 2} more`;
 }
 
-export async function scheduleAllVitalNotifications(
+export async function scheduleAllPrivaCareNotifications(
   medications: Medication[],
   skincareProducts: SkincareProduct[],
 ): Promise<void> {
@@ -104,7 +104,7 @@ export async function scheduleAllVitalNotifications(
   }
 }
 
-export async function cancelAllVitalNotifications(): Promise<void> {
+export async function cancelAllPrivaCareNotifications(): Promise<void> {
   if (Platform.OS === "web") return;
   const existing = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
