@@ -1,5 +1,8 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
+# User-attached files (screenshots, recordings, pasted text) — not part of the project
+attached_assets/
+
 # compiled output
 dist
 tmp
